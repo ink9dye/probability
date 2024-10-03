@@ -44,9 +44,9 @@ def parse_second_document(file_content):
                     value = int(parts[i + 2].strip())
                     line_conditions.append((card_name, operator, value))
                 except ValueError as e:
-                    print(f"Error processing condition in line: {line} - {e}")
+                    print(f"报错: {line} - {e}")
             else:
-                print(f"Incomplete condition in line: {line}")
+                print(f"输出情况: {line}")
         if line_conditions:
             conditions_list.append(line_conditions)
 
