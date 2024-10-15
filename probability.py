@@ -42,7 +42,7 @@ def check_conditions(drawn_cards, conditions):
 
 
 # 定义全局变量 pot_card_number，控制壶抽取的数量
-pot_card_number = 3
+pot_card_number = 6
 
 def handle_pot(drawn_cards, card_pool):
     """
@@ -55,13 +55,17 @@ def handle_pot(drawn_cards, card_pool):
 
         has_moving = any("动" in card for card in drawn_cards)  # 检查是否有"动"卡
         has_bugu_pa = any("补骨趴" in card for card in drawn_cards)  # 检查是否有"补骨趴"
-
+        has_demon = any("刻魔" in card for card in drawn_cards)  # 检查是否有"动"卡
         if not has_moving:  # 无动，找动
             for card in new_cards:
                 if "动" in card:
                     drawn_cards.append(card)
                     return drawn_cards
-
+        # if has_demon and not has_bugu_pa:  # 有动，无刻魔，找刻魔
+        #     for card in new_cards:
+        #         if "刻魔" in card:
+        #             drawn_cards.append(card)
+        #             return drawn_cards
         if has_moving and not has_bugu_pa:  # 有动，无补骨趴，找补骨趴
             for card in new_cards:
                 if "补骨趴" in card:
@@ -69,14 +73,15 @@ def handle_pot(drawn_cards, card_pool):
                     return drawn_cards
         # if has_moving and has_bugu_pa:  # 有动且有补骨趴，找手坑并加后置前缀
         #     for card in new_cards:
-        #         if "系统外" in card:
+        #         if "一滴" in card:
         #             drawn_cards.append(card)
         #             return drawn_cards
         if has_moving and has_bugu_pa:  # 有动且有补骨趴，找手坑并加后置前缀
             for card in new_cards:
                 if "手坑" in card:
                     selected_card = card.replace("手坑", "手后坑")
-                    drawn_cards.append("后置" + selected_card)
+                    # drawn_cards.append("后置" + selected_card)
+                    drawn_cards.append(selected_card)
                     return drawn_cards
 
 
