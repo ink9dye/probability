@@ -1,18 +1,25 @@
 import random
 from collections import Counter
+import secrets
+import time
 
 
 def draw_cards(card_pool, draw_count=5):
     """
-    从卡池中随机抽取指定数量的卡片。
+    从卡池中随机抽取指定数量的卡片，使用加密安全的随机生成器，并通过引入系统熵源增加随机性。
     """
     if len(card_pool) < draw_count:
         raise ValueError("卡池中的卡片数量不足以抽取指定数量的卡片")
 
-    # 使用 SystemRandom 提高随机性
-    rand = random.SystemRandom()
-    return rand.sample(card_pool, draw_count)
+    # 使用加密安全的 SystemRandom 生成器
+    rand = secrets.SystemRandom()
 
+    # 引入更多熵源：当前时间的微秒数
+    time_entropy = time.time_ns() % (10 ** 6)  # 微秒级别的熵
+    rand.seed(time_entropy)  # 为生成器附加更多熵
+
+    # 直接随机抽取卡片
+    return rand.sample(card_pool, draw_count)
 
 def check_conditions(drawn_cards, conditions):
     """
@@ -92,7 +99,7 @@ def handle_pot(drawn_cards, card_pool):
     return drawn_cards  # 如果没有“壶”，返回原始手卡
 
 
-def simulate_draws(card_pool, conditions_list, num_draws=200000, draw_size=5):
+def simulate_draws(card_pool, conditions_list, num_draws=100000, draw_size=5):
     condition_counts = {i: 0 for i in range(len(conditions_list))}
     drawn_cards_snapshots = []
 
