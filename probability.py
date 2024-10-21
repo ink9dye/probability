@@ -2,9 +2,14 @@ import random
 from collections import Counter
 import secrets
 import time
+draw_size=5
+num_draws=100000
+# 定义全局变量 N，用于每次输出累计概率的步长
+N = 11  # 例如每次统计前11种情况的累计概率
+# 定义全局变量 pot_card_number，控制壶抽取的数量
+pot_card_number = 6
 
-
-def draw_cards(card_pool, draw_count=5):
+def draw_cards(card_pool, draw_count):
     """
     从卡池中随机抽取指定数量的卡片，使用加密安全的随机生成器，并通过引入系统熵源增加随机性。
     """
@@ -48,8 +53,7 @@ def check_conditions(drawn_cards, conditions):
     return True
 
 
-# 定义全局变量 pot_card_number，控制壶抽取的数量
-pot_card_number = 6
+
 
 def handle_pot(drawn_cards, card_pool):
     """
@@ -59,10 +63,15 @@ def handle_pot(drawn_cards, card_pool):
         # 从剩余的卡中抽取指定数量的卡片（由全局变量 pot_card_number 控制）
         remaining_cards = [card for card in card_pool if card not in drawn_cards]
         new_cards = draw_cards(remaining_cards, pot_card_number)
-
+        has_blob= any("一滴" in card for card in new_cards)
         has_moving = any("动" in card for card in drawn_cards)  # 检查是否有"动"卡
         has_bugu_pa = any("补骨趴" in card for card in drawn_cards)  # 检查是否有"补骨趴"
         has_demon = any("刻魔" in card for card in drawn_cards)  # 检查是否有"动"卡
+        # if not has_blob:  # 无动，找动
+        #     for card in new_cards:
+        #         if "一滴" in card:
+        #             drawn_cards.append(card)
+        #             return drawn_cards
         if not has_moving:  # 无动，找动
             for card in new_cards:
                 if "动" in card:
@@ -99,7 +108,7 @@ def handle_pot(drawn_cards, card_pool):
     return drawn_cards  # 如果没有“壶”，返回原始手卡
 
 
-def simulate_draws(card_pool, conditions_list, num_draws=100000, draw_size=5):
+def simulate_draws(card_pool, conditions_list):
     condition_counts = {i: 0 for i in range(len(conditions_list))}
     drawn_cards_snapshots = []
 
@@ -148,8 +157,7 @@ def report_drawn_cards(drawn_cards_snapshots, conditions_list):
 
 
 
-# 定义全局变量 N，用于每次输出累计概率的步长
-N = 5  # 例如每次统计前5种情况的累计概率
+
 
 def report_probabilities(probabilities, conditions_list):
     """
@@ -159,6 +167,7 @@ def report_probabilities(probabilities, conditions_list):
 
     total_probability = 0  # 初始化总概率
     cumulative_probability = 0  # 用于累计前N个情况的概率
+    cumulative_probabilities = []  # 用于存储每N种情况的累计概率
 
     # 遍历每个情况的满足概率
     for i, prob in probabilities.items():
@@ -167,13 +176,20 @@ def report_probabilities(probabilities, conditions_list):
         total_probability += prob  # 累加每个情况的概率
         cumulative_probability += prob  # 累加前 N 种情况的概率
 
-        # 当达到第 N、2N、3N...次时，输出累计概率
+        # 当达到第 N、2N、3N...次时，输出累计概率，并保存到列表
         if (i + 1) % N == 0:
             print(f"前 {i + 1} 种情况的累计概率为: {cumulative_probability:.2%}")
+            cumulative_probabilities.append(cumulative_probability)
 
     # 最后输出总的累计概率
     if len(probabilities) % N != 0:
         print(f"前 {len(probabilities)} 种情况的累计概率为: {cumulative_probability:.2%}")
+        cumulative_probabilities.append(cumulative_probability)
 
     # 输出总概率
     print(f"所有情况的总概率为: {total_probability:.2%}")
+
+    # 循环打印前 N、2N、3N...的累计概率
+    print("\n累计概率汇总：")
+    for i in range(1, len(cumulative_probabilities) + 1):
+        print(f"前 {i * N} 种情况的累计概率为: {cumulative_probabilities[i - 1]:.2%}")

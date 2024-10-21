@@ -34,19 +34,23 @@ def parse_second_document(file_content):
     separator_pattern = r'[，,、．.]'  # 匹配中英文逗号、顿号、句号等分隔符
 
     for line in file_content.strip().split('\n'):
+        if not line.strip():  # 跳过空行
+            continue
         parts = re.split(separator_pattern, line)
         line_conditions = []
+        if len(parts) % 3 != 0:  # 如果行的数据长度不符合预期，则打印并跳过
+            print(f"输出情况（格式不符）: {line}")
+            continue
+
         for i in range(0, len(parts), 3):
-            if i + 2 < len(parts):
-                try:
-                    card_name = parts[i].strip()
-                    operator = parts[i + 1].strip()
-                    value = int(parts[i + 2].strip())
-                    line_conditions.append((card_name, operator, value))
-                except ValueError as e:
-                    print(f"报错: {line} - {e}")
-            else:
-                print(f"输出情况: {line}")
+            try:
+                card_name = parts[i].strip()
+                operator = parts[i + 1].strip()
+                value = int(parts[i + 2].strip())
+                line_conditions.append((card_name, operator, value))
+            except ValueError as e:
+                print(f"报错: {line} - {e}")
+
         if line_conditions:
             conditions_list.append(line_conditions)
 
