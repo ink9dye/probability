@@ -4,12 +4,19 @@ import re
 def parse_first_document(file_content):
     """
     解析第一个文档，生成卡池列表，并显示卡组总数。
+    忽略以#开头的文本行。
 
     :param file_content: 文档内容字符串，每行包含卡片名称和数量。
     :return: 包含卡片的列表，卡片按照数量重复。
     """
     card_pool = []
     for line in file_content.strip().split('\n'):
+        line = line.strip()
+
+        # 忽略以#开头的行
+        if line.startswith('#'):
+            continue
+
         try:
             # 按照不同的分隔符分割卡片名称和数量
             card_name, count = re.split(r'[，,、．.]', line)
@@ -23,6 +30,7 @@ def parse_first_document(file_content):
 
     return card_pool
 
+
 def parse_second_document(file_content):
     """
     解析第二个文档，生成按行分组的条件列表。
@@ -35,6 +43,9 @@ def parse_second_document(file_content):
 
     for line in file_content.strip().split('\n'):
         if not line.strip():  # 跳过空行
+            continue
+        # 忽略以#开头的行
+        if line.startswith('#'):
             continue
         parts = re.split(separator_pattern, line)
         line_conditions = []

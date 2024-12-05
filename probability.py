@@ -3,9 +3,10 @@ from collections import Counter
 import secrets
 import time
 draw_size=5
-num_draws=100000
+num_draws=200000
 # 定义全局变量 N，用于每次输出累计概率的步长
-N = 11  # 例如每次统计前11种情况的累计概率
+num_show=20000
+N = 6  # 例如每次统计前10种情况的累计概率
 # 定义全局变量 pot_card_number，控制壶抽取的数量
 pot_card_number = 6
 
@@ -67,6 +68,8 @@ def handle_pot(drawn_cards, card_pool):
         has_moving = any("动" in card for card in drawn_cards)  # 检查是否有"动"卡
         has_bugu_pa = any("补骨趴" in card for card in drawn_cards)  # 检查是否有"补骨趴"
         has_demon = any("刻魔" in card for card in drawn_cards)  # 检查是否有"动"卡
+        has_gun=any("枪" in card for card in drawn_cards)  # 检查是否有"枪"卡
+        has_bullet=any("龙骑" in card for card in drawn_cards)  # 检查是否有"子弹"卡
         # if not has_blob:  # 无动，找动
         #     for card in new_cards:
         #         if "一滴" in card:
@@ -82,9 +85,19 @@ def handle_pot(drawn_cards, card_pool):
         #         if "刻魔" in card:
         #             drawn_cards.append(card)
         #             return drawn_cards
-        if has_moving and not has_bugu_pa:  # 有动，无补骨趴，找补骨趴
+        # if has_moving and not has_bugu_pa:  # 有动，无补骨趴，找补骨趴
+        #     for card in new_cards:
+        #         if "补骨趴" in card:
+        #             drawn_cards.append(card)
+        #             return drawn_cards
+        if has_bullet and not has_gun:  # 有动，无子弹，补子弹
             for card in new_cards:
-                if "补骨趴" in card:
+                if "枪" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
+        if has_gun and not has_bullet:  # 有动，无子弹，补子弹
+            for card in new_cards:
+                if "子弹" in card:
                     drawn_cards.append(card)
                     return drawn_cards
         # if has_moving and has_bugu_pa:  # 有动且有补骨趴，找手坑并加后置前缀
@@ -92,13 +105,13 @@ def handle_pot(drawn_cards, card_pool):
         #         if "一滴" in card:
         #             drawn_cards.append(card)
         #             return drawn_cards
-        if has_moving and has_bugu_pa:  # 有动且有补骨趴，找手坑并加后置前缀
-            for card in new_cards:
-                if "手坑" in card:
-                    selected_card = card.replace("手坑", "手后坑")
-                    # drawn_cards.append("后置" + selected_card)
-                    drawn_cards.append(selected_card)
-                    return drawn_cards
+        # if has_moving and has_bugu_pa:  # 有动且有补骨趴，找手坑并加后置前缀
+        #     for card in new_cards:
+        #         if "手坑" in card:
+        #             selected_card = card.replace("手坑", "手后坑")
+        #             # drawn_cards.append("后置" + selected_card)
+        #             drawn_cards.append(selected_card)
+        #             return drawn_cards
 
 
         # 如果没有符合条件的，选第一张卡并加上“后置”前缀
@@ -123,7 +136,7 @@ def simulate_draws(card_pool, conditions_list):
                 condition_counts[i] += 1
                 break
 
-        if draw_num % 20000 == 0:
+        if draw_num % num_show == 0:
             drawn_cards_snapshots.append((draw_num, drawn_cards, matched_condition))
 
     probabilities = {i: count / num_draws for i, count in condition_counts.items()}
