@@ -86,3 +86,23 @@ def parse_documents(first_document_content, second_document_content):
     card_pool = parse_first_document(first_document_content)
     conditions_list = parse_second_document(second_document_content)
     return card_pool, conditions_list
+
+
+def get_comment_lines(file_path):
+    """
+    读取文件并返回所有以 # 开头的注释行。
+
+    :param file_path: 文档的文件路径。
+    :return: 包含所有注释行的列表，每行以 # 开头。
+    """
+    comment_lines = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            # 读取文件并逐行检查
+            for line in f:
+                if line.startswith('#'):  # 如果该行是注释行
+                    comment_lines.append(line.strip())
+    except FileNotFoundError:
+        print(f"错误：找不到文件 {file_path}")
+
+    return comment_lines

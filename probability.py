@@ -143,7 +143,7 @@ def simulate_draws(card_pool, conditions_list):
     return probabilities, drawn_cards_snapshots
 
 
-def simulate_and_report(card_pool, conditions_list):
+def simulate_and_report(card_pool, conditions_list,title):
     """
     进行抽卡模拟，记录每20000次的抽卡结果，并输出每个条件的满足概率。
     """
@@ -153,7 +153,7 @@ def simulate_and_report(card_pool, conditions_list):
     report_drawn_cards(drawn_cards_snapshots, conditions_list)
 
     # 输出每个条件的满足概率
-    report_probabilities(probabilities, conditions_list)
+    report_probabilities(probabilities, conditions_list,title)
 
 
 def report_drawn_cards(drawn_cards_snapshots, conditions_list):
@@ -172,7 +172,7 @@ def report_drawn_cards(drawn_cards_snapshots, conditions_list):
 
 
 
-def report_probabilities(probabilities, conditions_list):
+def report_probabilities(probabilities, conditions_list,title):
     """
     输出每个条件的满足概率，并计算和输出每前N种情况的累计概率。
     """
@@ -205,4 +205,4 @@ def report_probabilities(probabilities, conditions_list):
     # 循环打印前 N、2N、3N...的累计概率
     print("\n累计概率汇总：")
     for i in range(1, len(cumulative_probabilities) + 1):
-        print(f"前 {i * N} 种情况的累计概率为: {cumulative_probabilities[i - 1]:.2%}")
+        print(f"前 {i * N} 种情况({title[i-1]})的累计概率为: {cumulative_probabilities[i - 1]:.2%}")
