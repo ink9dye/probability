@@ -6,9 +6,9 @@ draw_size=5
 num_draws=200000
 # 定义全局变量 N，用于每次输出累计概率的步长
 num_show=20000
-N = 6  # 例如每次统计前10种情况的累计概率
+N = 11  # 例如每次统计前10种情况的累计概率
 # 定义全局变量 pot_card_number，控制壶抽取的数量
-pot_card_number = 6
+pot_card_number = 3
 
 def draw_cards(card_pool, draw_count):
     """
@@ -77,7 +77,7 @@ def handle_pot(drawn_cards, card_pool):
         #             return drawn_cards
         if not has_moving:  # 无动，找动
             for card in new_cards:
-                if "动" in card:
+                if "启动" in card:
                     drawn_cards.append(card)
                     return drawn_cards
         # if has_demon and not has_bugu_pa:  # 有动，无刻魔，找刻魔
@@ -92,7 +92,7 @@ def handle_pot(drawn_cards, card_pool):
         #             return drawn_cards
         if has_bullet and not has_gun:  # 有动，无子弹，补子弹
             for card in new_cards:
-                if "枪" in card:
+                if "机" in card:
                     drawn_cards.append(card)
                     return drawn_cards
         if has_gun and not has_bullet:  # 有动，无子弹，补子弹
@@ -204,5 +204,12 @@ def report_probabilities(probabilities, conditions_list,title):
 
     # 循环打印前 N、2N、3N...的累计概率
     print("\n累计概率汇总：")
-    for i in range(1, len(cumulative_probabilities) + 1):
-        print(f"前 {i * N} 种情况({title[i-1]})的累计概率为: {cumulative_probabilities[i - 1]:.2%}")
+
+    # 当累计概率只有一个时，直接输出
+    if len(cumulative_probabilities) == 1:
+        print(f"累计概率为: {cumulative_probabilities[0]:.2%}")
+    else:
+        # 循环输出每组的累计概率
+        for i, prob in enumerate(cumulative_probabilities, start=1):
+            title_text = title[i - 1] if i - 1 < len(title) else "无标题"
+            print(f"前 {i * N} 种情况({title_text})的累计概率为: {prob:.2%}")

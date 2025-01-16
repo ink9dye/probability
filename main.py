@@ -7,8 +7,8 @@ def main():
     主函数，负责协调整个流程。
     """
     # 定义文件路径
-    first_document_path = "构筑/宝石骑士构筑 .txt"
-    second_document_path = "构筑/宝石骑士启动.txt"
+    first_document_path = "构筑/雨sf的刻魔莫忘构筑.txt"
+    second_document_path = "构筑/刻魔莫忘废件上手.txt"
 
     # 读取文件内容
     #卡组
