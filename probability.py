@@ -8,7 +8,7 @@ num_draws=200000
 num_show=20000
 N = 11  # 例如每次统计前10种情况的累计概率
 # 定义全局变量 pot_card_number，控制壶抽取的数量
-pot_card_number = 3
+pot_card_number = 6
 
 def draw_cards(card_pool, draw_count):
     """
@@ -66,10 +66,12 @@ def handle_pot(drawn_cards, card_pool):
         new_cards = draw_cards(remaining_cards, pot_card_number)
         has_blob= any("一滴" in card for card in new_cards)
         has_moving = any("动" in card for card in drawn_cards)  # 检查是否有"动"卡
+        has_recoup=any("补" in card for card in drawn_cards)
+        has_trap=any("手坑" in card for card in drawn_cards)
         has_bugu_pa = any("补骨趴" in card for card in drawn_cards)  # 检查是否有"补骨趴"
         has_demon = any("刻魔" in card for card in drawn_cards)  # 检查是否有"动"卡
-        has_gun=any("枪" in card for card in drawn_cards)  # 检查是否有"枪"卡
-        has_bullet=any("龙骑" in card for card in drawn_cards)  # 检查是否有"子弹"卡
+        # has_gun=any("枪" in card for card in drawn_cards)  # 检查是否有"枪"卡
+        # has_bullet=any("龙骑" in card for card in drawn_cards)  # 检查是否有"子弹"卡
         # if not has_blob:  # 无动，找动
         #     for card in new_cards:
         #         if "一滴" in card:
@@ -77,7 +79,17 @@ def handle_pot(drawn_cards, card_pool):
         #             return drawn_cards
         if not has_moving:  # 无动，找动
             for card in new_cards:
-                if "启动" in card:
+                if "动" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
+        if not has_recoup:  # 无动，找动
+            for card in new_cards:
+                if "补" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
+        if not has_trap:
+            for card in new_cards:
+                if "手坑" in card:
                     drawn_cards.append(card)
                     return drawn_cards
         # if has_demon and not has_bugu_pa:  # 有动，无刻魔，找刻魔
@@ -90,16 +102,16 @@ def handle_pot(drawn_cards, card_pool):
         #         if "补骨趴" in card:
         #             drawn_cards.append(card)
         #             return drawn_cards
-        if has_bullet and not has_gun:  # 有动，无子弹，补子弹
-            for card in new_cards:
-                if "机" in card:
-                    drawn_cards.append(card)
-                    return drawn_cards
-        if has_gun and not has_bullet:  # 有动，无子弹，补子弹
-            for card in new_cards:
-                if "子弹" in card:
-                    drawn_cards.append(card)
-                    return drawn_cards
+        # if has_bullet and not has_gun:  # 有动，无子弹，补子弹
+        #     for card in new_cards:
+        #         if "机" in card:
+        #             drawn_cards.append(card)
+        #             return drawn_cards
+        # if has_gun and not has_bullet:  # 有动，无子弹，补子弹
+        #     for card in new_cards:
+        #         if "子弹" in card:
+        #             drawn_cards.append(card)
+        #             return drawn_cards
         # if has_moving and has_bugu_pa:  # 有动且有补骨趴，找手坑并加后置前缀
         #     for card in new_cards:
         #         if "一滴" in card:
@@ -120,6 +132,25 @@ def handle_pot(drawn_cards, card_pool):
 
     return drawn_cards  # 如果没有“壶”，返回原始手卡
 
+def zizou(drawn_cards, card_pool):
+    """
+    检测牌型中是否有大于等于1的主音和大于等于2的自奏。
+    如果满足条件，则再抽两张牌。
+    """
+    # 统计主音和自奏的数量
+    main_tone_count = sum(1 for card in drawn_cards if "主音" in card)
+    self_play_count = sum(1 for card in drawn_cards if "自奏" in card)
+
+    # 如果满足条件，再抽两张牌
+    if main_tone_count >= 1 and self_play_count >= 2:
+        # 从剩余的卡中抽取两张新卡
+        remaining_cards = [card for card in card_pool if card not in drawn_cards]
+        new_cards = draw_cards(remaining_cards, 2)
+        drawn_cards.extend(new_cards)  # 将新抽的牌加入手牌
+
+    return drawn_cards
+
+
 
 def simulate_draws(card_pool, conditions_list):
     condition_counts = {i: 0 for i in range(len(conditions_list))}
@@ -128,6 +159,7 @@ def simulate_draws(card_pool, conditions_list):
     for draw_num in range(1, num_draws + 1):
         drawn_cards = draw_cards(card_pool, draw_size)
         drawn_cards = handle_pot(drawn_cards, card_pool)
+        drawn_cards = zizou(drawn_cards, card_pool)  # 调用 zizou 函数
 
         matched_condition = None
         for i, condition_set in enumerate(conditions_list):

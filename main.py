@@ -8,7 +8,7 @@ def main():
     """
     # 定义文件路径
     first_document_path = "构筑/雨sf的刻魔莫忘构筑.txt"
-    second_document_path = "构筑/刻魔莫忘废件上手.txt"
+    second_document_path = "构筑/刻魔莫忘启动.txt"
 
     # 读取文件内容
     #卡组
