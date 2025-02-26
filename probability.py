@@ -6,7 +6,7 @@ draw_size=5
 num_draws=200000
 # 定义全局变量 N，用于每次输出累计概率的步长
 num_show=20000
-N = 11  # 例如每次统计前10种情况的累计概率
+N =7  # 例如每次统计前10种情况的累计概率
 # 定义全局变量 pot_card_number，控制壶抽取的数量
 pot_card_number = 6
 
@@ -97,11 +97,11 @@ def handle_pot(drawn_cards, card_pool):
         #         if "刻魔" in card:
         #             drawn_cards.append(card)
         #             return drawn_cards
-        # if has_moving and not has_bugu_pa:  # 有动，无补骨趴，找补骨趴
-        #     for card in new_cards:
-        #         if "补骨趴" in card:
-        #             drawn_cards.append(card)
-        #             return drawn_cards
+        if has_moving and not has_bugu_pa:  # 有动，无补骨趴，找补骨趴
+            for card in new_cards:
+                if "补骨趴" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
         # if has_bullet and not has_gun:  # 有动，无子弹，补子弹
         #     for card in new_cards:
         #         if "机" in card:
@@ -150,6 +150,22 @@ def zizou(drawn_cards, card_pool):
 
     return drawn_cards
 
+def anchou(drawn_cards, card_pool):
+    """
+    码丽丝的暗抽
+    """
+    # 统计主音和自奏的数量
+    main_tone_count = sum(1 for card in drawn_cards if "暗抽" in card)
+    self_play_count = sum(1 for card in drawn_cards if "暗" in card)
+
+    # 如果满足条件，再抽两张牌
+    if main_tone_count >= 1 and self_play_count >= 2:
+        # 从剩余的卡中抽取两张新卡
+        remaining_cards = [card for card in card_pool if card not in drawn_cards]
+        new_cards = draw_cards(remaining_cards, 2)
+        drawn_cards.extend(new_cards)  # 将新抽的牌加入手牌
+
+    return drawn_cards
 
 
 def simulate_draws(card_pool, conditions_list):
@@ -160,6 +176,7 @@ def simulate_draws(card_pool, conditions_list):
         drawn_cards = draw_cards(card_pool, draw_size)
         drawn_cards = handle_pot(drawn_cards, card_pool)
         drawn_cards = zizou(drawn_cards, card_pool)  # 调用 zizou 函数
+        drawn_cards = anchou(drawn_cards, card_pool)  # 调用 anchou 函数
 
         matched_condition = None
         for i, condition_set in enumerate(conditions_list):
