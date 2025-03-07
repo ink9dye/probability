@@ -6,7 +6,7 @@ draw_size=5
 num_draws=200000
 # 定义全局变量 N，用于每次输出累计概率的步长
 num_show=20000
-N =7  # 例如每次统计前10种情况的累计概率
+N =8  # 例如每次统计前10种情况的累计概率
 # 定义全局变量 pot_card_number，控制壶抽取的数量
 pot_card_number = 6
 
@@ -54,83 +54,72 @@ def check_conditions(drawn_cards, conditions):
     return True
 
 
-
-
 def handle_pot(drawn_cards, card_pool):
     """
     处理抽到的壶，决定加入手卡的逻辑。
     """
-    if any("壶" in card for card in drawn_cards):
+    # 如果手牌中有“金谦壶”
+    if any("金谦壶" in card for card in drawn_cards):
         # 从剩余的卡中抽取指定数量的卡片（由全局变量 pot_card_number 控制）
         remaining_cards = [card for card in card_pool if card not in drawn_cards]
         new_cards = draw_cards(remaining_cards, pot_card_number)
-        has_blob= any("一滴" in card for card in new_cards)
+
+        # 检查当前手牌中是否有特定的卡片
+        has_blob = any("一滴" in card for card in new_cards)
         has_moving = any("动" in card for card in drawn_cards)  # 检查是否有"动"卡
-        has_recoup=any("补" in card for card in drawn_cards)
-        has_trap=any("手坑" in card for card in drawn_cards)
+        has_recoup = any("补" in card for card in drawn_cards)
+        has_trap = any("手坑" in card for card in drawn_cards)
         has_bugu_pa = any("补骨趴" in card for card in drawn_cards)  # 检查是否有"补骨趴"
-        has_demon = any("刻魔" in card for card in drawn_cards)  # 检查是否有"动"卡
-        # has_gun=any("枪" in card for card in drawn_cards)  # 检查是否有"枪"卡
-        # has_bullet=any("龙骑" in card for card in drawn_cards)  # 检查是否有"子弹"卡
-        # if not has_blob:  # 无动，找动
-        #     for card in new_cards:
-        #         if "一滴" in card:
-        #             drawn_cards.append(card)
-        #             return drawn_cards
-        if not has_moving:  # 无动，找动
+        has_self=any("本家" in card for card in drawn_cards)
+
+        # 如果没有动卡，找动卡
+        if not has_moving:
             for card in new_cards:
                 if "动" in card:
                     drawn_cards.append(card)
                     return drawn_cards
-        if not has_recoup:  # 无动，找动
+
+        # 如果没有补卡，找补卡
+        if not has_recoup:
             for card in new_cards:
                 if "补" in card:
                     drawn_cards.append(card)
                     return drawn_cards
+        # 如果没有本家，找本家
+        if not has_moving:
+            for card in new_cards:
+                if "本家" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
+        # 如果没有手坑，找手坑
         if not has_trap:
             for card in new_cards:
                 if "手坑" in card:
                     drawn_cards.append(card)
                     return drawn_cards
-        # if has_demon and not has_bugu_pa:  # 有动，无刻魔，找刻魔
-        #     for card in new_cards:
-        #         if "刻魔" in card:
-        #             drawn_cards.append(card)
-        #             return drawn_cards
-        if has_moving and not has_bugu_pa:  # 有动，无补骨趴，找补骨趴
+
+        # 如果有动卡并且没有补骨趴，找补骨趴
+        if has_moving and not has_bugu_pa:
             for card in new_cards:
                 if "补骨趴" in card:
                     drawn_cards.append(card)
                     return drawn_cards
-        # if has_bullet and not has_gun:  # 有动，无子弹，补子弹
-        #     for card in new_cards:
-        #         if "机" in card:
-        #             drawn_cards.append(card)
-        #             return drawn_cards
-        # if has_gun and not has_bullet:  # 有动，无子弹，补子弹
-        #     for card in new_cards:
-        #         if "子弹" in card:
-        #             drawn_cards.append(card)
-        #             return drawn_cards
-        # if has_moving and has_bugu_pa:  # 有动且有补骨趴，找手坑并加后置前缀
-        #     for card in new_cards:
-        #         if "一滴" in card:
-        #             drawn_cards.append(card)
-        #             return drawn_cards
-        # if has_moving and has_bugu_pa:  # 有动且有补骨趴，找手坑并加后置前缀
-        #     for card in new_cards:
-        #         if "手坑" in card:
-        #             selected_card = card.replace("手坑", "手后坑")
-        #             # drawn_cards.append("后置" + selected_card)
-        #             drawn_cards.append(selected_card)
-        #             return drawn_cards
 
-
-        # 如果没有符合条件的，选第一张卡并加上“后置”前缀
+        # 如果没有符合条件的卡片，选择第一张卡并加上“后置”前缀
         drawn_cards.append("后置" + new_cards[0])
-        return drawn_cards
 
-    return drawn_cards  # 如果没有“壶”，返回原始手卡
+    # 如果手牌中有“强贪”
+    if any("强贪" in card for card in drawn_cards):
+        remaining_cards = [card for card in card_pool if card not in drawn_cards]
+        # 删除10张卡片
+        remaining_cards = remaining_cards[10:]
+        # 抽取两张卡
+        new_cards = draw_cards(remaining_cards, 2)
+        # 加上“后置”前缀并加入手卡
+        drawn_cards.append("后置" + new_cards[0])
+
+    return drawn_cards  # 返回最终的手卡
+
 
 def zizou(drawn_cards, card_pool):
     """
