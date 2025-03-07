@@ -95,7 +95,8 @@ def handle_pot(drawn_cards, card_pool):
         if not has_trap:
             for card in new_cards:
                 if "手坑" in card:
-                    drawn_cards.append(card)
+                    modified_card = card.replace("手坑", "手后坑")
+                    drawn_cards.append(modified_card)
                     return drawn_cards
 
         # 如果有动卡并且没有补骨趴，找补骨趴
