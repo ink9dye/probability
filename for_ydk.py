@@ -11,7 +11,8 @@ from collections import defaultdict,Counter
 # 配置参数
 API_BASE = "https://ygocdb.com/api/v0/card/"
 CSV_FILE = "local_cards.csv"
-CSV_HEADERS = ["id", "name_cn", "field"]
+CSV_HEADERS = ["id", "name", "field"]
+
 
 
 
@@ -25,40 +26,61 @@ class LocalCardDB:
         self.load_existing_data()
 
     def load_existing_data(self):
-        """加载本地已有数据"""
+        """强制从磁盘加载最新数据"""
+        self.existing_ids.clear()
+        self.id_name_map.clear()
+
         if os.path.exists(CSV_FILE):
             with open(CSV_FILE, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     card_id = row.get('id')
-                    name_cn = row.get('name_cn')
+                    name = row.get('name')
                     if card_id:
                         self.existing_ids.add(card_id)
-                        if name_cn:
-                            self.id_name_map[card_id] = name_cn
+                        if name:
+                            self.id_name_map[card_id] = name
+
+    def refresh(self):
+        """手动刷新缓存"""
+        self.load_existing_data()
+        print("✅ 缓存已刷新")
+
+    def get_card_name(self, card_id: str) -> str:
+        """获取卡牌名称（带自动刷新）"""
+        if card_id not in self.existing_ids:
+            self.refresh()  # 如果缓存里没有该 ID，尝试刷新一次再查
+        return self.id_name_map.get(card_id, "未知卡牌")
 
     def save_new_cards(self, new_data: List[Dict]):
+        """保存新卡到 CSV，并更新缓存"""
         filtered_data = []
         for item in new_data:
             cid = item.get('id')
             if cid and cid not in self.existing_ids:
                 filtered_data.append(item)
                 self.existing_ids.add(cid)
-                self.id_name_map[cid] = item['name_cn']
+                self.id_name_map[cid] = item['name']
 
         if not filtered_data:
             return
 
-        file_exists = os.path.exists(CSV_FILE)
         with open(CSV_FILE, 'a', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-            if not file_exists:
-                writer.writeheader()
             writer.writerows(filtered_data)
 
-    def get_card_name(self, card_id: str) -> str:
-        """获取卡牌名称（带缓存）"""
-        return self.id_name_map.get(card_id, "未知卡牌")
+        print(f"✅ 新增存储 {len(filtered_data)} 条记录到 {CSV_FILE}")
+
+    @staticmethod
+    def get_all_cards():
+        """静态方法：直接读取 CSV 返回所有卡牌字典"""
+        result = {}
+        if os.path.exists(CSV_FILE):
+            with open(CSV_FILE, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    result[row['id']] = row['name']
+        return result
 
 
 # --------------------------
@@ -108,21 +130,23 @@ def extract_field(types: str) -> str:
         "[魔法|永续]"       → "魔法"
         "[陷阱|反击]"       → "陷阱"
     """
+
     if not types or not types.startswith('['):
         return ""
 
     try:
-        # 只保留第一部分，如 "[怪兽|通常]"
-        main_part = types.split(']')[0].strip('[')
-        categories = main_part.split('|')
+        # 截断到第一个换行符前
+        main_part = types.split("\n", 1)[0]
 
-        # 获取可能包含的种族、属性等信息（比如“龙/光”）
+        # 提取基础分类（如 [怪兽|效果]）
+        categories = main_part.strip("[").split("]")[0].split("|")
+
+        # 处理后半部分（如“兽战士/暗”）
         extra_parts = []
-        for part in types.split(']')[1:]:
-            for sub_part in re.split(r'[ /、，]', part):
-                word = sub_part.strip()
-                if word and len(word) <= 3:  # 简单过滤掉描述性语句
-                    extra_parts.append(word)
+        for part in re.split(r"[ /、，]", main_part.split("]", 1)[-1]):
+            word = part.strip()
+            if word and len(word) <= 3:
+                extra_parts.append(word)
 
         combined = list(set(categories + extra_parts))
         return '、'.join([word for word in combined if word])
@@ -145,7 +169,7 @@ def process_raw_data(card_id: str, data: dict) -> Dict:
     # 去重并返回
     return {
         "id": card_id,
-        "name_cn": name,
+        "name": name,
         "field": '、'.join(sorted(set(field_parts), key=field_parts.index))  # 保持顺序去重
     }
 
@@ -194,6 +218,41 @@ def batch_process(card_ids: List[str], db: LocalCardDB) -> List[Dict]:
 
 
 
+def ensure_csv_structure():
+    """
+    确保 CSV 文件存在，并且包含正确的表头。
+    如果文件不存在 → 创建并写入 header；
+    如果存在但空 → 写入 header；
+    如果存在但没有 header 或 header 不匹配 → 插入 header。
+    """
+    if not os.path.exists(CSV_FILE):
+        with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
+            writer.writeheader()
+        print("✅ CSV 文件已创建并写入表头")
+        return
+
+    file_size = os.path.getsize(CSV_FILE)
+
+    if file_size == 0:
+        with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
+            writer.writeheader()
+        print("✅ CSV 文件为空，已写入表头")
+        return
+
+    with open(CSV_FILE, 'r', encoding='utf-8') as f:
+        first_line = f.readline().strip()
+
+    if first_line != ','.join(CSV_HEADERS):
+        temp_file = CSV_FILE + ".tmp"
+        with open(CSV_FILE, 'r', encoding='utf-8') as src, open(temp_file, 'w', newline='', encoding='utf-8') as dst:
+            writer = csv.DictWriter(dst, fieldnames=CSV_HEADERS)
+            writer.writeheader()
+            dst.write(src.read())
+        os.replace(temp_file, CSV_FILE)
+        print("✅ CSV 表头已修复并插入到最上方")
+
 
 def ydk_to_txt(ydk_content: str, csv_file: str, output_file: str = "output.txt"):
     """
@@ -201,19 +260,10 @@ def ydk_to_txt(ydk_content: str, csv_file: str, output_file: str = "output.txt")
     每个部分以 #main、#extra、#side 开头。
     """
 
-    # 1️⃣ 加载 CSV 数据（id -> name_cn）
-    id_to_name = {}
-    try:
-        with open(csv_file, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                card_id = row.get('id')
-                name_cn = row.get('name_cn')
-                if card_id and name_cn:
-                    id_to_name[card_id] = name_cn
-    except Exception as e:
-        print(f"❌ 加载 {csv_file} 失败：{e}")
-        return
+    # 1️⃣ 加载 CSV 数据（id -> name）
+    card_db = LocalCardDB()  # 自动加载一次
+    card_db.refresh()  # 强制刷新确保最新数据
+    id_to_name = card_db.id_name_map
 
     # 2️⃣ 解析 YDK 内容，提取 main、extra、side 中的卡牌 ID
     sections = {'main': [], 'extra': [], 'side': []}
@@ -261,34 +311,36 @@ def ydk_to_txt(ydk_content: str, csv_file: str, output_file: str = "output.txt")
     print(f"✅ 成功导出 {len(result_lines)} 行到 {output_file}")
 
 
+
+
+
 # --------------------------
 # 主流程
 # --------------------------
 if __name__ == "__main__":
     # 初始化本地数据库
     card_db = LocalCardDB()
-    print(extract_field("[怪兽|通常] 龙/光"))  # 输出：怪兽、龙、光
-    print(extract_field("[魔法|永续]"))  # 输出：魔法
-    print(extract_field("[陷阱|反击]"))  # 输出：陷阱
+    ensure_csv_structure()  # 确保 CSV 文件结构正确
+    # print(extract_field("[怪兽|通常] 龙/光"))  # 输出：怪兽、龙、光
+    # print(extract_field("[魔法|永续]"))  # 输出：魔法
+    # print(extract_field("[陷阱|反击]"))  # 输出：陷阱
 
     # 示例YDK内容
     ydk_content = """
-    #created by OURYGO
+#created by OURYGO
 #main
-101301005
-40366667
-40366667
-42141493
-40366667
+47705572
 87209160
 35618217
 35618217
 14152693
 50546208
-101301005
-101301005
+8379983
+8379983
+8379983
 42141493
-101301006
+42141493
+35763582
 83190280
 48427163
 14558127
@@ -300,7 +352,6 @@ if __name__ == "__main__":
 11317977
 11317977
 24094655
-47705572
 35726888
 35726888
 48444114
@@ -310,21 +361,24 @@ if __name__ == "__main__":
 87931906
 24224830
 24224830
+2344618
+2344618
+2344618
 57103969
 57103969
 57103969
-101301053
-101301053
-101301053
+40366667
+40366667
+40366667
 13935001
 #extra
-101301030
-101301030
+54701958
+54701958
 24550676
 88753594
 51777272
-101301031
-101301031
+81196066
+81196066
 96381979
 90590304
 66011101
