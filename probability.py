@@ -3,10 +3,10 @@ from collections import Counter
 import secrets
 import time
 draw_size=5
-num_draws=200000
+num_draws=100000
 # 定义全局变量 N，用于每次输出累计概率的步长
 num_show=20000
-N =8  # 例如每次统计前10种情况的累计概率
+N =11  # 例如每次统计前11种情况的累计概率
 # 定义全局变量 pot_card_number，控制壶抽取的数量
 pot_card_number = 6
 
@@ -58,6 +58,16 @@ def handle_pot(drawn_cards, card_pool):
     """
     处理抽到的壶，决定加入手卡的逻辑。
     """
+    if any("金满壶" in card for card in drawn_cards):
+        remaining_cards = [card for card in card_pool if card not in drawn_cards]
+        new_cards = draw_cards(remaining_cards, 2)
+
+        # 修改 new_cards 中包含 "手坑" 的元素
+        new_cards = [card.replace("手坑", "手后坑") if "手坑" in card else card for card in new_cards]
+
+        drawn_cards.extend(new_cards)  # 将新抽的牌加入手牌
+        return drawn_cards
+
     # 如果手牌中有“金谦壶”
     if any("金谦壶" in card for card in drawn_cards):
         # 从剩余的卡中抽取指定数量的卡片（由全局变量 pot_card_number 控制）
@@ -107,6 +117,8 @@ def handle_pot(drawn_cards, card_pool):
                     return drawn_cards
 
         # 如果没有符合条件的卡片，选择第一张卡并加上“后置”前缀
+        if "手坑" in new_cards[0]:
+            new_cards[0] = new_cards[0].replace("手坑", "手后坑")
         drawn_cards.append("后置" + new_cards[0])
 
     # 如果手牌中有“强贪”
