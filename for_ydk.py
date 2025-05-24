@@ -23,12 +23,14 @@ class LocalCardDB:
     def __init__(self):
         self.existing_ids = set()
         self.id_name_map = {}
+        self.id_field_map = {}  # 新增字段映射缓存
         self.load_existing_data()
 
     def load_existing_data(self):
         """强制从磁盘加载最新数据"""
         self.existing_ids.clear()
         self.id_name_map.clear()
+        self.id_field_map.clear()  # 清空字段缓存
 
         if os.path.exists(CSV_FILE):
             with open(CSV_FILE, 'r', encoding='utf-8') as f:
@@ -36,10 +38,13 @@ class LocalCardDB:
                 for row in reader:
                     card_id = row.get('id')
                     name = row.get('name')
+                    field = row.get('field', "").split("、")  # 字段拆分为列表
                     if card_id:
                         self.existing_ids.add(card_id)
                         if name:
                             self.id_name_map[card_id] = name
+                        if field:
+                            self.id_field_map[card_id] = field
 
     def refresh(self):
         """手动刷新缓存"""
@@ -71,6 +76,19 @@ class LocalCardDB:
 
         print(f"✅ 新增存储 {len(filtered_data)} 条记录到 {CSV_FILE}")
 
+    def has_field(self, card_id: str, keyword: str) -> bool:
+        """判断某张卡是否具有指定关键词字段"""
+        if card_id not in self.existing_ids:
+            self.refresh()
+        return keyword in self.id_field_map.get(card_id, [])
+
+    def get_all_keywords(self) -> set:
+        """获取所有字段关键词"""
+        keywords = set()
+        for fields in self.id_field_map.values():
+            keywords.update(fields)
+        return keywords
+
     @staticmethod
     def get_all_cards():
         """静态方法：直接读取 CSV 返回所有卡牌字典"""
@@ -81,6 +99,7 @@ class LocalCardDB:
                 for row in reader:
                     result[row['id']] = row['name']
         return result
+
 
 
 # --------------------------
