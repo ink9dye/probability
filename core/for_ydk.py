@@ -10,7 +10,7 @@ from collections import defaultdict,Counter
 
 # 配置参数
 API_BASE = "https://ygocdb.com/api/v0/card/"
-CSV_FILE = "local_cards.csv"
+CSV_FILE = "../data/local_cards.csv"
 CSV_HEADERS = ["id", "name", "field"]
 
 
@@ -450,4 +450,4 @@ if __name__ == "__main__":
     print_section("额外卡组", extra_ids)
     print_section("副卡组", side_ids)
 
-    ydk_to_txt(ydk_content, "local_cards.csv", "我的构筑.txt")
+    ydk_to_txt(ydk_content, "../data/local_cards.csv", "我的构筑.txt")
