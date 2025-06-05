@@ -1,204 +1,120 @@
-你的项目结构已经非常清晰、规范，并且具备 **良好的可维护性、可扩展性和 SBA 架构风格**。为了帮助你更好地理解和使用这个结构，我将为每个文件加上详细的标注说明，并指出它们在系统中的职责和作用。
-
----
-
-## ✅ 项目结构详解（带注释）
+### 项目目录结构
 
 ```
-yg-probability/
-│
-├── core/                  # 核心业务逻辑层（SBA 架构的服务模块）
-│   ├── interfaces.py        # 定义所有服务接口（ICardPoolParser, ISimulationEngine 等），实现接口抽象
-│   ├── services/            # 具体服务实现目录
-│   │   ├── deck_service.py       # 卡组解析服务，处理卡组文件的加载与缓存
-│   │   ├── condition_service.py  # 条件解析服务，解析条件文件并生成条件集合
-│   │   ├── simulation_service.py # 模拟引擎服务，封装抽卡模拟流程和结果统计
-│   │   └── ydk_service.py        # YDK 文件处理服务，提供 YDK 到 TXT 的转换及 API 请求支持
-│   ├── probability.py       # 抽卡核心逻辑模块，包含随机抽卡、特殊卡牌处理、条件判断等函数
-│   ├── file_read.py         # 文件读取与解析模块，支持 txt、csv 等格式
-│   ├── ydk_processor.py     # YDK 文件处理器，调用本地数据库或远程 API 获取卡牌信息
-│
-├── gui/                   # GUI 界面层（Tkinter 实现）
-│   ├── main_window.py       # 主窗口类，继承 Tk，负责窗口初始化、菜单栏和页面容器管理
-│   ├── controller.py        # 控制器类，MVC 中的 Controller，协调 View 和 Model 的交互
-│   ├── frames/              # 各功能页面组件
-│   │   ├── deck_frame.py           # 卡池设置页：选择卡池文件、显示卡池内容
-│   │   ├── condition_frame.py      # 条件设置页：选择条件文件、展示条件列表
-│   │   ├── simulation_run_frame.py # 模拟执行页：配置参数、启动模拟、显示日志
-│   │   ├── result_display_frame.py # 结果展示页：展示概率统计、支持导出 CSV
-│   │   └── strategy_config_frame.py# 策略配置页（可选）：配置壶抽取策略、累计步长等
-│   ├── widgets/             # 可复用 UI 组件
-│   │   ├── table_view.py    # 表格控件封装（如 Treeview）
-│   │   └── progress_bar.py  # 进度条组件封装
-│
-├── data/                  # 数据存储层
-│   ├── local_cards.csv      # 本地卡牌数据库（由 ydk_processor.py 自动生成和补全）
-│   ├── decks/               # 用户存放卡池构筑文件的目录
-│   └── conditions/          # 用户存放条件规则文件的目录
-│
-├── utils/                 # 工具类库（通用工具）
-│   ├── logger.py            # 日志记录模块，用于调试和异常追踪
-│   ├── api_client.py        # 网络请求封装，统一调用外部 API（如 YGOCDB）
-│   └── exceptions.py        # 自定义异常类，统一错误处理
-│
-├── config/                # 配置管理
-│   ├── settings.py          # 全局常量配置（如 draw_size、num_draws、N 等）
-│   └── style_config.py      # GUI 样式配置（字体、颜色、布局样式等）
-│
-├── test/                  # 测试代码（可选）
-│   ├── test_deck_service.py
-│   ├── test_condition_service.py
-│   └── test_simulation.py
-│
-├── main.py                # 程序入口，负责启动主窗口并绑定控制器
-│
-├── requirements.txt       # Python 依赖清单（如 requests, matplotlib, secrets）
-│
-├── setup.py               # setuptools 打包配置文件（用于 pip install . 或构建 wheel 包）
-│
-├── pyinstaller.spec       # PyInstaller 打包配置文件（用于构建 EXE）
-│
-├── resources/             # 资源文件（打包时使用）
-│   ├── icon.ico           # 应用图标
-│   └── README.txt         # 使用说明文档（打包后附带）
-│
-└── TODO.md                # 开发计划文档（开发路线图 + 模块依赖顺序 + 优先级划分）
+概率
+├── .venv
+├── config
+│   └── settings.py  # 配置文件，存储全局配置项（如 API 地址、CSV 文件路径等）
+├── core
+│   ├── file_read.py  # 文件读取模块，负责解析卡池文件和条件文件
+│   ├── interfaces.py  # 接口定义模块，定义核心功能的抽象接口
+│   ├── probability.py  # 抽卡模拟模块，实现抽卡逻辑和条件判断
+│   └── ydk_processor.py  # YDK 处理模块，处理 YDK 文件并转换为中文版 txt 卡表
+├── data
+│   └── local_cards.csv  # 本地卡牌数据文件，存储卡牌信息（id, name, field）
+├── gui
+│   ├── frames
+│   │   ├── condition_frame.py  # 条件设置页面，用于选择和展示条件文件内容
+│   │   ├── deck_frame.py  # 卡池设置页面，用于选择和展示卡池文件内容
+│   │   ├── result_display_frame.py  # 结果展示页面，展示抽卡结果和满足概率
+│   │   ├── simulation_run_frame.py  # 模拟执行页面，配置参数并启动模拟
+│   │   └── strategy_config_frame.py  # 策略配置页面（具体功能待定）
+│   ├── widgets
+│   │   ├── progress_bar.py  # 进度条组件，用于显示模拟进度
+│   │   └── table_view.py  # 表格视图组件，用于展示数据表格
+│   ├── controller.py  # 控制器模块，管理各页面之间的状态流转和核心模块调用
+│   └── main_window.py  # 主窗口类，构建整个 GUI 的基础框架
+├── services
+│   ├── condition_service.py  # 条件服务模块，提供条件相关的业务逻辑
+│   ├── deck_service.py  # 卡池服务模块，提供卡池相关的业务逻辑
+│   ├── simulation_service.py  # 模拟服务模块，封装抽卡模拟的业务逻辑
+│   └── ydk_service.py  # YDK 服务模块，封装 YDK 相关的业务逻辑
+├── test
+│   └── ...  # 测试相关文件
+├── utils
+│   └── logger.py  # 日志记录模块，提供日志记录功能
+├── 构筑与启动
+│   ├── ...  # 构建和启动相关的文件（如示例卡池文件、条件文件等）
+├── main.py  # 项目入口文件，协调整个流程
+├── modify_text.py  # 文本修改工具模块（具体功能待定）
+├── README.md  # 项目说明文档
+├── requirements.txt  # 项目依赖文件，列出项目所需的所有 Python 包
+├── structure.md  # 项目结构说明文档
+├── TODO.md  # 待办事项清单，记录项目开发计划和任务
+└── 我的架构.txt  # 项目架构设计文档
 ```
 
 
----
+### 各个文件的作用
 
-## 🧱 按模块说明其职责
+#### 根目录
 
-### `core/` —— 核心业务逻辑（SBA 服务层）
+- **`main.py`**：项目入口文件，负责协调整个流程，包括文件读取、解析、抽卡模拟等。
+- **`README.md`**：项目说明文档，介绍项目的基本信息、使用方法等。
+- **`requirements.txt`**：项目依赖文件，列出项目所需的所有 Python 包，便于环境搭建。
+- **`TODO.md`**：待办事项清单，记录项目开发计划和任务，指导后续开发工作。
+- **`structure.md`**：项目结构说明文档，描述项目的整体结构和各部分的功能。
+- **`我的架构.txt`**：项目架构设计文档，详细描述项目的架构设计思路和实现方案。
 
-| 文件 | 描述 |
-|------|------|
-| `interfaces.py` | 定义所有服务接口，如 `IDeckService`, `IConditionService`, `ISimulationEngine` |
-| `deck_service.py` | 实现卡池解析服务，提供 `parse_deck()` 方法 |
-| `condition_service.py` | 实现条件解析服务，提供 `parse_conditions()` 方法 |
-| `simulation_service.py` | 封装模拟逻辑，提供 `run_simulation()` 方法 |
-| [ydk_service.py](file://E:\pythons\概率\core\services\ydk_service.py) | 实现 YDK 文件解析与转换服务 |
-| [probability.py](file://E:\pythons\概率\core\probability.py) | 抽卡模拟核心算法，包括抽卡、条件匹配、壶处理、概率计算 |
-| [file_read.py](file://E:\pythons\概率\core\file_read.py) | 文件内容读取与解析工具，支持多种分隔符 |
-| [ydk_processor.py](file://E:\pythons\概率\core\ydk_processor.py) | YDK 解析、API 请求、本地数据库操作 |
+#### [config](file://E:\pythons\概率\.venv\Lib\site-packages\uvicorn\config.py#L0-L0) 目录
 
----
+- **[settings.py](file://E:\pythons\概率\config\settings.py)**：配置文件，存储全局配置项，如 API 地址、CSV 文件路径等，方便统一管理和修改。
 
-### `gui/` —— GUI 界面层（MVC 架构）
+#### [core](file://E:\pythons\概率\.venv\Lib\site-packages\pip\_vendor\idna\core.py#L0-L0) 目录
 
-| 文件 | 描述 |
-|------|------|
-| [main_window.py](file://E:\pythons\概率\gui\main_window.py) | 主窗口类，负责创建窗口、菜单栏、切换页面 |
-| [controller.py](file://E:\pythons\概率\gui\controller.py) | MVC 控制器，协调界面事件与核心服务交互 |
-| `frames/deck_frame.py` | 卡池设置页面，用户选择卡池文件并预览内容 |
-| `frames/condition_frame.py` | 条件设置页面，用户选择条件文件并展示条件 |
-| `frames/simulation_run_frame.py` | 模拟运行页面，设置参数并触发模拟 |
-| `frames/result_display_frame.py` | 模拟结果展示页面，表格形式显示概率 |
-| `frames/strategy_config_frame.py` | 策略配置页面（可选），用于修改壶抽取逻辑等 |
-| `widgets/table_view.py` | 自定义表格组件，支持 Treeview 的封装 |
-| `widgets/progress_bar.py` | 自定义进度条组件，用于显示模拟进度 |
+- **[file_read.py](file://E:\pythons\概率\core\file_read.py)**：文件读取模块，负责解析卡池文件和条件文件，提供文件读取和解析功能。
+- **[interfaces.py](file://E:\pythons\概率\core\interfaces.py)**：接口定义模块，定义核心功能的抽象接口，如卡池解析接口、模拟引擎接口等，便于模块间的解耦和扩展。
+- **[probability.py](file://E:\pythons\概率\core\probability.py)**：抽卡模拟模块，实现抽卡逻辑和条件判断，是项目的核心功能模块。
+- **[ydk_processor.py](file://E:\pythons\概率\core\ydk_processor.py)**：YDK 处理模块，处理 YDK 文件并转换为中文版 txt 卡表，提供 YDK 相关的数据处理功能。
 
----
+#### [data](file://E:\pythons\概率\.venv\Lib\site-packages\PyInstaller\archive\writers.py#L0-L0) 目录
 
-### `data/` —— 数据持久化
+- **[local_cards.csv](file://E:\pythons\概率\data\local_cards.csv)**：本地卡牌数据文件，存储卡牌信息（id, name, field），供项目使用。
 
-| 文件 | 描述 |
-|------|------|
-| [local_cards.csv](file://E:\pythons\概率\data\local_cards.csv) | 存储从 API 获取的卡牌信息，供 ydk 处理使用 |
-| `decks/` | 存放用户自定义的卡池构筑文件 |
-| `conditions/` | 存放用户自定义的条件规则文件 |
+#### `gui` 目录
 
----
+- **`frames` 目录**：
+  - **[condition_frame.py](file://E:\pythons\概率\gui\frames\condition_frame.py)**：条件设置页面，用于选择和展示条件文件内容，提供条件设置的用户界面。
+  - **[deck_frame.py](file://E:\pythons\概率\gui\frames\deck_frame.py)**：卡池设置页面，用于选择和展示卡池文件内容，提供卡池设置的用户界面。
+  - **[result_display_frame.py](file://E:\pythons\概率\gui\frames\result_display_frame.py)**：结果展示页面，展示抽卡结果和满足概率，提供结果展示的用户界面。
+  - **[simulation_run_frame.py](file://E:\pythons\概率\gui\frames\simulation_run_frame.py)**：模拟执行页面，配置参数并启动模拟，提供模拟执行的用户界面。
+  - **[strategy_config_frame.py](file://E:\pythons\概率\gui\frames\strategy_config_frame.py)**：策略配置页面（具体功能待定），可能用于配置特定的抽卡策略。
+- **`widgets` 目录**：
+  - **[progress_bar.py](file://E:\pythons\概率\gui\widgets\progress_bar.py)**：进度条组件，用于显示模拟进度，提供进度条 UI 组件。
+  - **[table_view.py](file://E:\pythons\概率\gui\widgets\table_view.py)**：表格视图组件，用于展示数据表格，提供表格视图 UI 组件。
+- **[controller.py](file://E:\pythons\概率\gui\controller.py)**：控制器模块，管理各页面之间的状态流转和核心模块调用，是 GUI 的核心控制层。
+- **[main_window.py](file://E:\pythons\概率\gui\main_window.py)**：主窗口类，构建整个 GUI 的基础框架，是 GUI 的入口文件。
 
-### `utils/` —— 工具类库
+#### `services` 目录
 
-| 文件 | 描述 |
-|------|------|
-| [logger.py](file://E:\pythons\概率\utils\logger.py) | 提供统一的日志记录方式，便于调试和异常排查 |
-| `api_client.py` | 对网络请求进行封装，提高代码复用性 |
-| `exceptions.py` | 自定义异常类型，如 `FileReadError`, `SimulationError` 等 |
+- **[condition_service.py](file://E:\pythons\概率\services\condition_service.py)**：条件服务模块，提供条件相关的业务逻辑，如条件解析、条件判断等。
+- **[deck_service.py](file://E:\pythons\概率\services\deck_service.py)**：卡池服务模块，提供卡池相关的业务逻辑，如卡池解析、卡池管理等。
+- **[simulation_service.py](file://E:\pythons\概率\services\simulation_service.py)**：模拟服务模块，封装抽卡模拟的业务逻辑，提供模拟执行的相关功能。
+- **[ydk_service.py](file://E:\pythons\概率\services\ydk_service.py)**：YDK 服务模块，封装 YDK 相关的业务逻辑，提供 YDK 数据处理的相关功能。
 
----
+#### `test` 目录
 
-### `config/` —— 配置管理
+- **`...`**：测试相关文件，包含单元测试、集成测试等，用于保证代码质量和功能正确性。
 
-| 文件 | 描述 |
-|------|------|
-| [settings.py](file://E:\pythons\概率\config\settings.py) | 全局常量配置，如抽卡次数、每次抽卡数量、累计步长等 |
-| `style_config.py` | GUI 样式配置，如字体大小、按钮颜色、窗口布局等 |
+#### [utils](file://E:\pythons\概率\.venv\Lib\site-packages\fastapi\utils.py#L0-L0) 目录
 
----
+- **[logger.py](file://E:\pythons\概率\utils\logger.py)**：日志记录模块，提供日志记录功能，便于调试和问题追踪。
 
-### `test/` —— 单元测试目录（建议后期补充）
+#### `构筑与启动` 目录
 
-| 文件 | 描述 |
-|------|------|
-| `test_deck_service.py` | 卡池服务单元测试 |
-| `test_condition_service.py` | 条件服务单元测试 |
-| `test_simulation.py` | 抽卡模拟逻辑单元测试 |
+- **`...`**：构建和启动相关的文件（如示例卡池文件、条件文件等），提供项目运行所需的示例数据和配置。
 
----
+#### [modify_text.py](file://E:\pythons\概率\modify_text.py)
 
-### `resources/` —— 打包资源
+- **[modify_text.py](file://E:\pythons\概率\modify_text.py)**：文本修改工具模块（具体功能待定），可能用于对文本进行特定的修改或处理。
 
-| 文件 | 描述 |
-|------|------|
-| `icon.ico` | 应用图标 |
-| `README.txt` | 使用说明文档，打包后随程序一起发布 |
+### 总结
 
----
-
-## ✅ 总结
-
-你的结构设计已经非常标准，具备以下优点：
-
-- ✅ **SBA 架构体现充分**：服务接口 + 具体实现分离，方便替换和 Mock。
-- ✅ **MVC 架构清晰**：GUI 层与核心逻辑解耦，提升可维护性。
-- ✅ **模块职责单一**：每个模块只做一件事，符合 SRP 原则。
-- ✅ **易于扩展**：新增功能只需添加新服务/页面，不影响现有模块。
-- ✅ **适合团队协作**：分工明确，各模块之间依赖关系清晰。
-- ✅ **适合打包发布**：有专门的资源目录、打包脚本和依赖清单。
-
----
-
-## 🔧 推荐后续动作
-
-1. **编写接口定义**：
-   ```python
-   # core/interfaces.py
-   from abc import ABC, abstractmethod
-   class IDeckService(ABC):
-       @abstractmethod
-       def parse(self, content: str) -> List[str]:
-           pass
-   ```
-
-
-2. **注入依赖**：
-   ```python
-   # gui/controller.py
-   from core.interfaces import IDeckService, IConditionService
-   class AppController:
-       def __init__(self, deck_service: IDeckService, condition_service: IConditionService):
-           self.deck_service = deck_service
-           self.condition_service = condition_service
-   ```
-
-
-3. **完善单元测试**：
-   ```bash
-   python -m pytest test/test_deck_service.py
-   ```
-
-
-4. **使用 Type Hints 和 Pydantic**（可选）：
-
-
-
-5. **增加 Strategy 设计模式**（可选）：
-
-
-
----
+- **[config](file://E:\pythons\概率\.venv\Lib\site-packages\uvicorn\config.py#L0-L0) 和 [settings.py](file://E:\pythons\概率\config\settings.py)**：负责项目的全局配置。
+- **[core](file://E:\pythons\概率\.venv\Lib\site-packages\pip\_vendor\idna\core.py#L0-L0) 目录**：包含项目的核心业务逻辑模块，如文件读取、抽卡模拟、YDK 处理等。
+- **`services` 目录**：封装具体的业务服务，提供更高层次的业务逻辑支持。
+- **`gui` 目录**：构建项目的图形用户界面（GUI），包括各个功能页面和 UI 组件。
+- **[data](file://E:\pythons\概率\.venv\Lib\site-packages\PyInstaller\archive\writers.py#L0-L0) 目录**：存储项目所需的数据文件，如本地卡牌数据。
+- **[utils](file://E:\pythons\概率\.venv\Lib\site-packages\fastapi\utils.py#L0-L0) 目录**：提供通用的工具模块，如日志记录。
+- **`test` 目录**：包含项目的测试相关文件，确保代码质量。
 

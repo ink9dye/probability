@@ -74,52 +74,37 @@ def handle_pot(drawn_cards, card_pool):
         remaining_cards = [card for card in card_pool if card not in drawn_cards]
         new_cards = draw_cards(remaining_cards, pot_card_number)
 
-        # 检查当前手牌中是否有特定的卡片
-        has_blob = any("一滴" in card for card in new_cards)
-        has_moving = any("动" in card for card in drawn_cards)  # 检查是否有"动"卡
-        has_recoup = any("补" in card for card in drawn_cards)
-        has_trap = any("手坑" in card for card in drawn_cards)
-        has_bugu_pa = any("补骨趴" in card for card in drawn_cards)  # 检查是否有"补骨趴"
-        has_self=any("本家" in card for card in drawn_cards)
+        # 已有的状态检查
 
-        # 如果没有动卡，找动卡
-        if not has_moving:
-            for card in new_cards:
-                if "动" in card:
-                    drawn_cards.append(card)
-                    return drawn_cards
 
-        # 如果没有补卡，找补卡
-        if not has_recoup:
-            for card in new_cards:
-                if "补" in card:
-                    drawn_cards.append(card)
-                    return drawn_cards
-        # 如果没有本家，找本家
-        if not has_moving:
-            for card in new_cards:
-                if "本家" in card:
-                    drawn_cards.append(card)
-                    return drawn_cards
-        # 如果没有手坑，找手坑
-        if not has_trap:
-            for card in new_cards:
-                if "手坑" in card:
-                    modified_card = card.replace("手坑", "手后坑")
-                    drawn_cards.append(modified_card)
-                    return drawn_cards
+        # 定义优先级查找的文本列表
+        priority_list = ["赌魂", "螺禅", "博士", "苏", "手坑"]
 
-        # 如果有动卡并且没有补骨趴，找补骨趴
-        if has_moving and not has_bugu_pa:
-            for card in new_cards:
-                if "补骨趴" in card:
-                    drawn_cards.append(card)
-                    return drawn_cards
+        selected_card = None
 
-        # 如果没有符合条件的卡片，选择第一张卡并加上“后置”前缀
-        if "手坑" in new_cards[0]:
-            new_cards[0] = new_cards[0].replace("手坑", "手后坑")
-        drawn_cards.append("后置" + new_cards[0])
+        # 按照优先级顺序查找
+        for keyword in priority_list:
+            for card in new_cards:
+                if keyword in card:
+                    selected_card = card
+                    break
+            if selected_card:
+                break
+
+        # 根据条件逻辑进行最终处理
+        if selected_card:
+            # 对“手坑”进行替换
+            if "手坑" in selected_card:
+                selected_card = selected_card.replace("手坑", "手后坑")
+            drawn_cards.append(selected_card)
+        else:
+            # 没有找到符合条件的卡片时，选择第一个卡并加“后置”前缀
+            selected_card = new_cards[0]
+            if "手坑" in selected_card:
+                selected_card = selected_card.replace("手坑", "手后坑")
+            drawn_cards.append("后置" + selected_card)
+
+        return drawn_cards
 
     # 如果手牌中有“强贪”
     if any("强贪" in card for card in drawn_cards):

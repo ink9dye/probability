@@ -1,6 +1,6 @@
 # core/interfaces.py
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import List, Dict,Tuple
 
 class ICardPoolParser(ABC):
     @abstractmethod
