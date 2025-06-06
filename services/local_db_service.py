@@ -65,8 +65,23 @@ class LocalCardDB:
         if not filtered:
             return
 
-        with open(CSV_FILE, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
-            writer.writerows(filtered)
+        # 读取现有数据 + 合并新数据 + 排序
+        all_data = []
+        if os.path.exists(CSV_FILE):
+            with open(CSV_FILE, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                all_data = list(reader)
 
-        print(f"✅ 添加新卡 {len(filtered)} 条记录")
+        merged = {item['id']: item for item in all_data}
+        for item in filtered:
+            merged[item['id']] = item
+
+        sorted_data = sorted(merged.values(), key=lambda x: int(x['id']))
+
+        # 覆盖写入整个 CSV 文件
+        with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
+            writer.writeheader()
+            writer.writerows(sorted_data)
+
+        print(f"添加新卡 {len(filtered)} 条记录，并已按 ID 排序更新 CSV 文件")
