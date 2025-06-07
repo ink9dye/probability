@@ -8,8 +8,63 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 import requests
 import os
+import re
+from typing import Dict, List
 
 db = LocalCardDB()
+
+
+
+def extract_field(types: str) -> str:
+    """
+    从 types 字段中提取有意义的关键词，如：
+        "[怪兽|通常] 龙/光" → "怪兽、龙、光"
+        "[魔法|永续]"       → "魔法"
+        "[陷阱|反击]"       → "陷阱"
+    """
+
+    if not types or not types.startswith('['):
+        return ""
+
+    try:
+        main_part = types.split("\n", 1)[0]
+        categories = main_part.strip("[").split("]")[0].split("|")
+        extra_parts = []
+        for part in re.split(r"[ /、，]", main_part.split("]", 1)[-1]):
+            word = part.strip()
+            if word and len(word) <= 3:
+                extra_parts.append(word)
+
+        combined = list(set(categories + extra_parts))
+        return '、'.join([word for word in combined if word])
+    except Exception as e:
+        print(f"Error extracting field from '{types}': {e}")
+        return ""
+
+
+def process_raw_data(card_id: str, data: dict) -> Dict:
+    text_section = data.get("text", {})
+    name = text_section.get("name", "")
+    types = text_section.get("types", "")
+
+    field_parts = extract_field(types).split('、')
+
+    # 添加 name 到 field 中（可选）
+    if name:
+        field_parts.append(name)
+
+    # 去重并保持顺序
+    unique_field_parts = []
+    for part in field_parts:
+        if part not in unique_field_parts:
+            unique_field_parts.append(part)
+
+    return {
+        "id": card_id,
+        "name": name,
+        "field": '、'.join(unique_field_parts)
+    }
+
 
 
 def fetch_card(card_id: str):
@@ -17,13 +72,11 @@ def fetch_card(card_id: str):
         resp = requests.get(f"{API_BASE}{card_id}", timeout=5)
         if resp.status_code == 200:
             data = resp.json()
-            return {
-                "id": card_id,
-                "name": data.get("text", {}).get("name", ""),
-            }
+            return process_raw_data(card_id, data)
     except Exception as e:
         print(f"Error fetching {card_id}: {e}")
     return None
+
 
 
 def batch_fetch_missing(ids: list[str]):
