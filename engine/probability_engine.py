@@ -1,55 +1,49 @@
-# probability_engine.py
 import random
 from collections import Counter, defaultdict
 from typing import List, Tuple
-from engine.strategy_rules import apply_all_strategies
-from entity.condition import Condition
+from engine.strategy_rules import apply_all_strategies  # 若未用可移除
+from entity.composite_condition import CompositeCondition
 from entity.card import Card
+from services.local_db_service import LocalCardDB
+from parsers.ydk_parser import clean_card_name
 
-# engine/probability_engine.py
-
-def check_conditions(drawn: List[str], conditions: List[Condition]) -> bool:
-    """
-    检查抽到的手牌是否满足任意一组条件组合
-    :param drawn: 抽到的卡牌名称列表
-    :param conditions: 条件组合列表
-    :return: 是否满足任意一个条件组
-    """
-    cards = [Card(name=name) for name in drawn]
-
-    for cond in conditions:
-        if cond.is_satisfied(cards):
-            return True
-    return False
-
+def check_conditions(cards: List[Card], condition: CompositeCondition) -> bool:
+    return condition.is_satisfied(cards)
 
 def simulate_draws(card_pool: List[str],
-                   conditions: List[List[Condition]],
+                   conditions: List[CompositeCondition],
                    titles: List[str],
-                   draw_size: int = 5,
-                   num_draws: int = 100000,
-                   snapshot_interval: int = 20000
-                   ) -> Tuple[List[int | None], List[Tuple[int, List[str], List[Condition] | None]]]:
+                   draw_size: int,
+                   num_draws: int,
+                   snapshot_interval: int) -> Tuple[List[int | None], List[Tuple[int, List[str], CompositeCondition | None]]]:
     matched_indices: List[int | None] = []
     snapshots = []
 
+    db = LocalCardDB()
+    name_to_fields = {v: db.id_field_map[k] for k, v in db.id_name_map.items()}
+    card_map = {}
+    for name, fields in name_to_fields.items():
+        clean_name = clean_card_name(name)
+        card_map[clean_name] = Card(name=clean_name, fields=fields)
+
     for draw_num in range(1, num_draws + 1):
-        hand = random.sample(card_pool, draw_size)
-        hand = apply_all_strategies(hand, card_pool)
+        hand_names = random.sample(card_pool, draw_size)
+        hand_cards = [card_map[name] for name in hand_names]
 
         matched_index = None
-        for i, conds in enumerate(conditions):
-            if check_conditions(hand, conds):
+        for i, cond in enumerate(conditions):
+            if check_conditions(hand_cards, cond):
                 matched_index = i
                 break
+
         matched_indices.append(matched_index)
 
         if draw_num % snapshot_interval == 0:
-            snapshots.append((draw_num, hand, conditions[matched_index] if matched_index is not None else None))
+            snapshots.append((draw_num, hand_names, conditions[matched_index] if matched_index is not None else None))
 
     return matched_indices, snapshots
 
-def summarize_results(matched_indices: List[int | None], titles: List[str], total_conditions: int, conditions: List[List[Condition]]):
+def summarize_results(matched_indices: List[int | None], titles: List[str], total_conditions: int, conditions: List[CompositeCondition]):
     counts = [0] * total_conditions
     for idx in matched_indices:
         if idx is not None:
@@ -65,7 +59,7 @@ def summarize_results(matched_indices: List[int | None], titles: List[str], tota
         title = titles[i]
         prob = count / total_draws
         total_hits += count
-        print(f"{title}: {'，'.join(str(c) for c in conditions[i])} 的概率为 {prob:.2%}")
+        print(f"{title}: {'，'.join(str(c) for c in conditions[i].get_sub_conditions())} 的概率为 {prob:.2%}")
 
         cumulative += count
         is_last_of_title = (i == len(titles) - 1) or (titles[i + 1] != title)

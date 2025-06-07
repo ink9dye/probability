@@ -39,3 +39,10 @@ def parse_ydk_text(text: str) -> tuple[list[str], list[str], list[str]]:
                 main_ids.append(line)
 
     return main_ids, extra_ids, side_ids
+
+def clean_card_name(name: str) -> str:
+    """
+    清理卡牌名称中的中文引号、空格、单双引号等。
+    示例："“K9案件”" → "K9案件"
+    """
+    return name.strip().strip('“”"\'')

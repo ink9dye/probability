@@ -7,6 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 import re
 from typing import Dict, List
+from parsers.ydk_parser import clean_card_name
+
 
 db = LocalCardDB()
 
@@ -89,8 +91,7 @@ def load_ydk_file(file_path: str) -> List[str]:
     main_ids, _, _ = parse_ydk_text(ydk_content)
     batch_fetch_missing(main_ids)
     unique_ids = sorted(set(main_ids), key=int)
-    return [db.get_card_name(cid) for cid in unique_ids]
-
+    return [clean_card_name(db.get_card_name(cid)) for cid in unique_ids]  # ✅ 清洗卡名
 
 def export_to_txt(main_ids: List[str], extra_ids: List[str], side_ids: List[str], output_file: str = None):
     from collections import defaultdict
