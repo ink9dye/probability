@@ -10,14 +10,14 @@ def main():
     condition_path = "启动/征服斗魂启动.txt"
 
     # 加载卡池（按构筑文本解析）
-    card_pool = get_deck(deck_path, is_ydk=False, is_path=True)
-
+    deck = get_deck(deck_path, is_ydk=False, is_path=True)
+    print(f"[INFO] 当前卡组共 {len(deck)} 张卡牌")
     # 加载条件与标题
     conditions, titles = get_conditions(condition_path, is_path=True)
 
     # 执行抽卡模拟并报告
     run_simulation(
-        card_pool=card_pool,
+        deck=deck,
         conditions=conditions,
         draw_size=5,
         num_draws=100000,

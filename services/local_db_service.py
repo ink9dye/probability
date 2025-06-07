@@ -10,12 +10,14 @@ class LocalCardDB:
         self.existing_ids = set()
         self.id_name_map = {}
         self.id_field_map = {}
+        self.field_to_names = defaultdict(set)  # 新增：字段 → 卡名集合
         self.load_existing_data()
 
     def load_existing_data(self):
         self.existing_ids.clear()
         self.id_name_map.clear()
         self.id_field_map.clear()
+        self.field_to_names.clear()  # 清空旧字段映射
 
         if not os.path.exists(CSV_FILE):
             return
@@ -26,10 +28,15 @@ class LocalCardDB:
                 cid = row.get("id")
                 name = row.get("name")
                 fields = row.get("field", "").split("、")
+
                 if cid:
                     self.existing_ids.add(cid)
                     self.id_name_map[cid] = name
                     self.id_field_map[cid] = fields
+
+                # 更新字段 → 卡名映射
+                for field in fields:
+                    self.field_to_names[field].add(name)
 
     def refresh(self):
         self.load_existing_data()
@@ -44,13 +51,18 @@ class LocalCardDB:
         return keyword in self.id_field_map.get(cid, [])
 
     def get_all_keywords(self) -> set[str]:
-        keywords = set()
-        for fields in self.id_field_map.values():
-            keywords.update(fields)
-        return keywords
+        return set(self.field_to_names.keys())
 
     def get_all_cards(self) -> dict[str, str]:
         return dict(self.id_name_map)
+
+    def get_cards_by_field(self, keyword: str) -> set[str]:
+        """
+        获取具有指定字段的所有卡牌名称集合
+        :param keyword: 字段关键词，如 "炎"
+        :return: 卡牌名称集合
+        """
+        return self.field_to_names.get(keyword, set())
 
     def save_new_cards(self, new_data: list[dict]):
         filtered = []
@@ -60,7 +72,12 @@ class LocalCardDB:
                 filtered.append(item)
                 self.existing_ids.add(cid)
                 self.id_name_map[cid] = item.get("name")
-                self.id_field_map[cid] = item.get("field", "").split("、")
+                fields = item.get("field", "").split("、")
+                self.id_field_map[cid] = fields
+
+                # 同步更新 field_to_names
+                for field in fields:
+                    self.field_to_names[field].add(item["name"])
 
         if not filtered:
             return

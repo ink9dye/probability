@@ -4,7 +4,7 @@ from engine.strategy_rules import apply_all_strategies
 from typing import List, Tuple
 from entity.condition import Condition
 
-def run_simulation(card_pool: List[str], conditions: List[List[Condition]],
+def run_simulation(deck: List[str], conditions: List[List[Condition]],
                    draw_size: int = 5, num_draws: int = 100000,
                    snapshot_interval: int = 20000,
                    titles: List[str] = None) -> None:
@@ -12,7 +12,7 @@ def run_simulation(card_pool: List[str], conditions: List[List[Condition]],
     运行模拟主流程，并输出报告。
     """
     matched_indices, snapshots = simulate_draws(
-        card_pool=card_pool,
+        deck=deck,
         conditions=conditions,
         titles=titles,
         draw_size=draw_size,

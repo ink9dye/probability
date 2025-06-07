@@ -5,17 +5,22 @@ from typing import List, Tuple
 from engine.strategy_rules import apply_all_strategies
 from entity.condition import Condition
 from entity.card import Card
+from services.local_db_service import LocalCardDB
+
+# 实例化数据库（建议在模块加载时初始化一次）
+db = LocalCardDB()
 
 # engine/probability_engine.py
 
 def check_conditions(drawn: List[str], conditions: List[Condition]) -> bool:
-    """
-    检查抽到的手牌是否满足任意一组条件组合
-    :param drawn: 抽到的卡牌名称列表
-    :param conditions: 条件组合列表
-    :return: 是否满足任意一个条件组
-    """
-    cards = [Card(name=name) for name in drawn]
+    cards = []
+    for name in drawn:
+        fields = []
+        # 使用字段映射更快获取字段信息
+        for field in db.get_all_keywords():
+            if name in db.get_cards_by_field(field):
+                fields.append(field)
+        cards.append(Card(name=name, fields=fields))
 
     for cond in conditions:
         if cond.is_satisfied(cards):
@@ -23,7 +28,7 @@ def check_conditions(drawn: List[str], conditions: List[Condition]) -> bool:
     return False
 
 
-def simulate_draws(card_pool: List[str],
+def simulate_draws(deck: List[str],
                    conditions: List[List[Condition]],
                    titles: List[str],
                    draw_size: int = 5,
@@ -34,8 +39,8 @@ def simulate_draws(card_pool: List[str],
     snapshots = []
 
     for draw_num in range(1, num_draws + 1):
-        hand = random.sample(card_pool, draw_size)
-        hand = apply_all_strategies(hand, card_pool)
+        hand = random.sample(deck, draw_size)
+        hand = apply_all_strategies(hand, deck)
 
         matched_index = None
         for i, conds in enumerate(conditions):
