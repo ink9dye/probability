@@ -4,14 +4,24 @@ from collections import Counter, defaultdict
 from typing import List, Tuple
 from engine.strategy_rules import apply_all_strategies
 from entity.condition import Condition
+from entity.card import Card
+
+# engine/probability_engine.py
 
 def check_conditions(drawn: List[str], conditions: List[Condition]) -> bool:
-    counter = Counter(drawn)
+    """
+    检查抽到的手牌是否满足任意一组条件组合
+    :param drawn: 抽到的卡牌名称列表
+    :param conditions: 条件组合列表
+    :return: 是否满足任意一个条件组
+    """
+    cards = [Card(name=name) for name in drawn]
+
     for cond in conditions:
-        matched_count = sum(v for name, v in counter.items() if cond.card_name in name)
-        if not cond.is_satisfied(matched_count):
-            return False
-    return True
+        if cond.is_satisfied(cards):
+            return True
+    return False
+
 
 def simulate_draws(card_pool: List[str],
                    conditions: List[List[Condition]],

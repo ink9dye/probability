@@ -97,5 +97,5 @@ if __name__ == "__main__":
     print_section("副卡组", side_ids)
 
     # 导出 TXT 构筑
-    output_path = "我的构筑.txt"
+    output_path = "征服斗魂构筑.txt"
     export_to_txt(main_ids, extra_ids, side_ids, output_file=output_path)

@@ -1,43 +1,52 @@
 # entity/condition.py
+from typing import List, Tuple
 
 class Condition:
-    def __init__(self, card_name: str, operator: str, value: int, group_title: str | None = None):
+    def __init__(self, expression: str, operator: str, value: int, group_title: str | None = None):
         """
-        初始化一个条件对象，用于判断卡牌或字段的数量是否满足某种逻辑条件。
+        初始化一个条件对象，支持 AND 组合条件与比较操作符。
 
-        :param card_name: 条件对应的卡名或关键词（如 "手坑"、"融合" 等）
-        :param operator: 逻辑操作符（支持中文和符号形式，如 "大于等于", ">="）
-        :param value: 目标数量值，用于比较
-        :param group_title: 所属标题组（从 # 行中继承，可为 None，表示该条件归属的分类标题）
+        :param expression: 条件表达式，支持 AND 组合，用 & 分隔，如 "坏兽 & 炎"
+        :param operator: 比较操作符，如 ">=", "==", "<" 等
+        :param value: 目标数值
+        :param group_title: 所属标题组（可选）
         """
-        self.card_name = card_name.strip()  # 去除前后空格，标准化卡名或关键词
-        self.operator = operator.strip()  # 标准化操作符字符串
-        self.value = value  # 比较的目标数值
-        self.group_title = group_title.lstrip('#').strip() if group_title else None  # 新增字段，用于分组显示或筛选
+        self.keywords = [k.strip() for k in expression.split("&")]
+        self.operator = operator.strip()
+        self.value = value
+        self.group_title = group_title.lstrip('#').strip() if group_title else None
 
-    def is_satisfied(self, count: int) -> bool:
+    def match_card(self, card) -> bool:
         """
-        判断给定数量是否满足当前条件。
+        判断一张卡是否满足本条件中的所有关键词要求。
+        可以是卡名包含任意关键字，或者字段中包含所有关键字。
+        """
+        # 至少有一个关键字出现在卡名中
+        name_match = any(kw in card.name for kw in self.keywords)
 
-        :param count: 当前统计到的卡牌或字段数量
-        :return: 如果满足条件返回 True，否则返回 False
+        # 所有关键字必须在字段中出现（或部分在卡名中）
+        field_match = all(card.has_field(kw) or kw in card.name for kw in self.keywords)
+
+        return name_match or field_match
+
+    def is_satisfied(self, cards: List['Card']) -> bool:
         """
-        if self.operator == "大于" or self.operator == ">":
+        判断给定卡牌列表中，满足本条件的数量是否符合操作符要求。
+        """
+        matched = [c for c in cards if self.match_card(c)]
+        count = len(matched)
+
+        if self.operator in [">", "大于"]:
             return count > self.value
-        elif self.operator == "大于等于" or self.operator == ">=":
+        elif self.operator in [">=", "大于等于"]:
             return count >= self.value
-        elif self.operator == "等于" or self.operator == "=":
+        elif self.operator in ["==", "=", "等于"]:
             return count == self.value
-        elif self.operator == "小于" or self.operator == "<":
+        elif self.operator in ["<", "小于"]:
             return count < self.value
-        elif self.operator == "小于等于" or self.operator == "<=":
+        elif self.operator in ["<=", "小于等于"]:
             return count <= self.value
-        return False  # 默认不满足任何条件时返回 False
+        return False
 
     def __repr__(self):
-        """
-        返回当前条件对象的简洁字符串表示。
-        :return: 字符串格式为 "card_name operator value"
-        """
-        return f"{self.card_name} {self.operator} {self.value}"
-
+        return f"({' & '.join(self.keywords)}) {self.operator} {self.value}"

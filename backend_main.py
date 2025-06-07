@@ -6,8 +6,8 @@ from services.simulation_service import run_simulation
 
 def main():
     """主控流程：加载构筑与启动条件，执行模拟"""
-    deck_path = "构筑与启动/mls构筑 .txt"
-    condition_path = "构筑与启动/mls启动.txt"
+    deck_path = "构筑/征服斗魂构筑.txt"
+    condition_path = "启动/征服斗魂启动.txt"
 
     # 加载卡池（按构筑文本解析）
     card_pool = get_deck(deck_path, is_ydk=False, is_path=True)
