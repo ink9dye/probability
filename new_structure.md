@@ -10,6 +10,7 @@
 ├── entity/                            # ✅ 模型层
 │   ├── card.py                        # Card 模型类
 │   ├── condition.py                   # Condition 模型类
+│   ├── composite_condition.py         # CompositeCondition 模型类
 ├── parsers/                           # 数据解析器模块（统一负责 YDK / TXT 构筑、条件的读取与转换）
 │   ├── __init__.py
 │   ├── card_pool_parser.py           # ✅ 解析卡组 TXT → List[str]（卡名）
