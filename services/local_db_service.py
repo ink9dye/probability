@@ -35,7 +35,7 @@ class LocalCardDB:
     def refresh(self):
         """重新加载本地数据库"""
         self.load_existing_data()
-        print("🔄 本地数据库已刷新")
+        print("本地数据库已刷新")
 
     # ================== 卡片信息查询 ==================
     def get_card_name(self, cid: str) -> str:

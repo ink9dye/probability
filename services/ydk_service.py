@@ -15,22 +15,47 @@ db = LocalCardDB()
 
 
 def extract_field(types: str) -> str:
-    """从 YGO 卡牌类型字符串中提取字段标签。"""
+    """从 YGO 卡牌类型字符串中提取字段标签，并优化族/属性表示"""
     if not types or '[' not in types:
         return ""
+
     try:
         main_part = types.split('\n', 1)[0].strip()
-        category_str = main_part.split(']', 1)[0].strip('[')
+        category_str = main_part.split(']')[0].strip('[')
         categories = [c.strip() for c in category_str.split('|') if c.strip()]
         extra_str = main_part.split(']', 1)[1].strip()
-        extra_parts = [part.strip() for part in re.split(r'[\\/\s、，；]', extra_str) if part.strip() and len(part.strip()) <= 3]
+
         combined = []
-        for word in categories + extra_parts:
-            if word and word not in combined:
-                combined.append(word)
-        return '、'.join(combined)
-    except Exception:
+
+        # 添加主类别字段（如：怪兽、效果）
+        combined.extend(categories)
+
+        # 处理“种族/属性”结构
+        if '/' in extra_str:
+            race, attr = [s.strip() for s in extra_str.split('/', 1)]
+            if race:
+                combined.append(f"{race}族")
+            if attr:
+                combined.append(f"{attr}属性")
+        else:
+            # 没有斜杠时直接添加
+            parts = re.split(r'[\\/\s、，；]', extra_str)
+            for part in parts:
+                part = part.strip()
+                if part:
+                    combined.append(part)
+
+        # 去重并返回
+        unique_fields = []
+        for word in combined:
+            if word and word not in unique_fields:
+                unique_fields.append(word)
+
+        return '、'.join(unique_fields)
+    except Exception as e:
+        print(f"[ERROR] 字段提取失败: {e}")
         return ""
+
 
 
 
