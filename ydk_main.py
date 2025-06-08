@@ -8,6 +8,13 @@ import os
 # 初始化数据库
 db = LocalCardDB()
 
+
+def print_section(title: str, ids: list[str]):
+    print(f"\n=== {title} ===")
+    for idx, cid in enumerate(ids, 1):
+        name = db.get_card_name(cid)
+        print(f"{idx:2d}. [{cid}] {name}")
+
 # 示例 YDK 内容（直接写入代码中）
 ydk_content = """
 #created by OURYGO
@@ -86,12 +93,6 @@ if __name__ == "__main__":
     batch_fetch_missing(all_ids)
 
     # 显示卡组详情
-    def print_section(title: str, ids: list[str]):
-        print(f"\n=== {title} ===")
-        for idx, cid in enumerate(ids, 1):
-            name = db.get_card_name(cid)
-            print(f"{idx:2d}. [{cid}] {name}")
-
     print_section("主卡组", main_ids)
     print_section("额外卡组", extra_ids)
     print_section("副卡组", side_ids)

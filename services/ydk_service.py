@@ -5,6 +5,7 @@ from config.settings import API_BASE
 from utils.file_utils import write_to_file
 from concurrent.futures import ThreadPoolExecutor
 import requests
+from collections import defaultdict
 import re
 from typing import Dict, List
 from parsers.ydk_parser import clean_card_name
@@ -30,6 +31,9 @@ def extract_field(types: str) -> str:
         return '、'.join(combined)
     except Exception:
         return ""
+
+
+
 
 
 def process_raw_data(card_id: str, data: dict) -> Dict:
@@ -60,6 +64,39 @@ def process_raw_data(card_id: str, data: dict) -> Dict:
     }
 
 
+def ensure_hand_traps_loaded():
+    """
+    确保手坑卡组已加载并添加了“手坑”字段
+    """
+    hand_trap_file = "data/手坑.ydk"
+
+    # 解析手坑文件中的卡牌 ID
+    with open(hand_trap_file, 'r', encoding='utf-8') as f:
+        ydk_content = f.read()
+    main_ids, _, _ = parse_ydk_text(ydk_content)
+
+    # 分类处理：已存在 / 需要下载 / 需要加字段
+    need_fetch = []
+    need_update = []
+
+    for cid in main_ids:
+        if cid not in db.existing_ids:
+            need_fetch.append(cid)
+        elif not db.has_field(cid, "手坑"):
+            need_update.append(cid)
+
+    # 1. 下载缺失卡牌数据
+    if need_fetch:
+        print(f"🔍 发现 {len(need_fetch)} 张未记录的手坑卡牌，正在下载...")
+        batch_fetch_missing(need_fetch)
+
+    # 2. 更新字段（包括刚下载的新卡）
+    all_hand_trap_ids = sorted(set(main_ids), key=int)
+    db.update_cards_field(all_hand_trap_ids, "手坑")  # 自动去重判断
+
+    print("✅ 手坑卡组已确保加载，并已添加“手坑”字段")
+
+
 def fetch_card(card_id: str):
     try:
         resp = requests.get(f"{API_BASE}{card_id}", timeout=5)
@@ -85,16 +122,23 @@ def batch_fetch_missing(ids: List[str]):
             db.save_new_cards(new_cards)
 
 
-def load_ydk_file(file_path: str) -> List[str]:
+def load_ydk_file(file_path: str, field_tag: str = None) -> List[str]:
+    ensure_hand_traps_loaded()
     with open(file_path, 'r', encoding='utf-8') as f:
         ydk_content = f.read()
     main_ids, _, _ = parse_ydk_text(ydk_content)
     batch_fetch_missing(main_ids)
+
+    # 获取并更新字段信息
     unique_ids = sorted(set(main_ids), key=int)
-    return [clean_card_name(db.get_card_name(cid)) for cid in unique_ids]  # ✅ 清洗卡名
+    if field_tag:
+        db.update_cards_field(unique_ids, field_tag)  # 调用 LocalCardDB 的新方法
+
+    return [clean_card_name(db.get_card_name(cid)) for cid in unique_ids]
 
 def export_to_txt(main_ids: List[str], extra_ids: List[str], side_ids: List[str], output_file: str = None):
-    from collections import defaultdict
+
+    ensure_hand_traps_loaded()
     combined_ids = main_ids if main_ids else (extra_ids + side_ids)
     batch_fetch_missing(combined_ids)
     name_counter = defaultdict(int)

@@ -19,5 +19,9 @@ class Card:
     def has_field(self, keyword: str) -> bool:
         return any(keyword in field for field in self.fields)
 
+    def add_field(self, field: str):
+        if field not in self.fields:
+            self.fields.append(field)
+
     def __repr__(self):
         return f"Card(name={self.name}, count={self.count})"
