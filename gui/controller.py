@@ -71,18 +71,19 @@ class AppController:
     def get_all_cards(self):
         return self.db.get_all_cards()
 
-    def add_card(self, name: str, fields: List[str]) -> None:
-        self.db.add_card(name, fields)  # ✅ 使用 self.db
+    # gui/controller.py
 
-    def add_field_to_cards(self, cids: List[str], field: str) -> None:
-        for cid in cids:
-            self.db.add_card_field(cid, field)  # ✅ 使用 self.db
+    def update_card_attribute(self, cid: str, attr_name: str, old_value: str, new_value: str) -> bool:
+        return self.db.update_card_attribute(cid, attr_name, old_value, new_value)
 
-    def update_card_field(self, cid: str, old_field: str, new_field: str) -> bool:
-        return self.db.update_card_field(cid, old_field, new_field)
+    def add_card_attribute(self, cid: str, attr_name: str, value: str) -> bool:
+        return self.db.add_card_attribute(cid, attr_name, value)
 
-    def remove_card_field(self, cid: str, field: str) -> bool:
-        return self.db.remove_card_field(cid, field)
+    def remove_card_attribute(self, cid: str, attr_name: str, value: str) -> bool:
+        return self.db.remove_card_attribute(cid, attr_name, value)
+
+    def get_card_attributes(self, cid: str) -> Dict[str, Union[str, List[str]]]:
+        return self.db.get_card_attributes(cid)
 
     def get_all_fields(self) -> Set[str]:
         return self.db.get_all_fields()
