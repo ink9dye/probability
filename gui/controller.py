@@ -1,12 +1,9 @@
-
+import os
 from services.ydk_service import load_ydk_file, export_to_txt
 from services.parser_service import load_deck, load_conditions
-
-
 from services.simulation_service import run_simulation,simulate_draws,summarize_results
-from services.local_db_service import LocalCardDB
 from typing import List, Union, Set, Dict,Tuple
-import os
+from services.local_db_service import get_local_db
 
 
 class AppController:
@@ -15,7 +12,7 @@ class AppController:
         self.card_pool: List[str] = []
         self.condition_data = []
         self.titles = []
-        self.db = LocalCardDB()
+        self.db = get_local_db()
 
 
 
@@ -69,12 +66,17 @@ class AppController:
             callback=callback
         )
 
-    def _get_cids_from_names(self, card_names: List[str]) -> List[str]:
-        name_to_id = {v: k for k, v in self.db.id_name_map.items()}
-        return [name_to_id[name] for name in card_names if name in name_to_id]
+    #卡片数据库相关
+
+    def get_all_cards(self):
+        return self.db.get_all_cards()
+
+    def add_card(self, name: str, fields: List[str]) -> None:
+        self.db.add_card(name, fields)  # ✅ 使用 self.db
 
     def add_field_to_cards(self, cids: List[str], field: str) -> None:
-        self.db.update_cards_field(cids, field)
+        for cid in cids:
+            self.db.add_card_field(cid, field)  # ✅ 使用 self.db
 
     def update_card_field(self, cid: str, old_field: str, new_field: str) -> bool:
         return self.db.update_card_field(cid, old_field, new_field)
@@ -85,9 +87,15 @@ class AppController:
     def get_all_fields(self) -> Set[str]:
         return self.db.get_all_fields()
 
+    def get_card_fields(self, cid: str) -> List[str]:
+        return self.db.get_card_fields(cid)
+
     def search_cards_by_keyword(self, keyword: str) -> Dict[str, str]:
-        all_cards = self.db.get_all_cards()
-        return {cid: name for cid, name in all_cards.items() if keyword in name}
+        """
+        根据关键词模糊搜索卡牌名称（不区分大小写）
+        返回 {cid: name} 字典
+        """
+        return self.db.search_cards_by_keyword(keyword)
 
     def refresh_local_db(self) -> None:
         self.db.refresh()

@@ -1,65 +1,74 @@
 # ✅ 项目结构重组建议（基于 SOA + MVC + Entity 模型）
-```
-# 顶层结构
-概率/
-├── main.py
-# 配置 & 工具
-├── config/
-│   └── settings.py                    # 配置路径、API参数等
-# 数据资源
-├── data/
-│   └── local_cards.csv              # 本地卡牌数据文件，仅用于字段定义、ID-名称映射等
-# 模型层（Entity / Domain Models）
-├── entity/                            # ✅ 模型层
-│   ├── card.py                        # Card 模型类
-│   ├── condition.py                   # Condition 模型类
-│   ├── composite_condition.py         # CompositeCondition 模型类
-# 解析器（Parser / Loader）
-├── parsers/                           # 数据解析器模块（统一负责 YDK / TXT 构筑、条件的读取与转换）
-│   ├── __init__.py
-│   ├── card_pool_parser.py           # ✅ 解析卡组 TXT → List[str]（卡名）
-│   ├── condition_parser.py           # ✅ 解析启动条件 TXT → List[Condition]（条件模型）
-│   ├── ydk_parser.py                 # ✅ 解析 YDK 文本或文件 → Tuple[List[str], List[str], List[str]]
-│   └── unified_loader.py             # ✅ 新增统一入口：支持文本/文件路径（YDK 或 构筑卡组/条件）
-# 服务层（SOA Services）
-├── services/
-│   ├── __init__.py
-│   ├── simulation_service.py        # 抽卡模拟器逻辑
-│   ├── parser_service.py            # 封装 parser 对外接口
-│   ├── ydk_service.py               # YDK 卡组管理服务（解析 + 中文转换）
-│   └── local_db_service.py          # 本地 CSV 卡牌数据库服务（缓存、刷新、字段匹配）
-├── repositories/                      # ✅ 数据访问层（DAO / Repository）
-│   └── card_repository.py             # LocalCardDB 实现
-# 模拟引擎（Core Logic）
-├── engine/                            # 模拟核心引擎
-│   ├── __init__.py
-│   ├── probability_engine.py         # 实现抽卡模拟主逻辑
-│   └── strategy_rules.py             # 封装“壶”、“暗抽”、“自奏”等策略
-# GUI（MVC: View + Controller）
-├── gui/                               # 前端界面（MVC: View + Controller）
-│   ├── frames/                       # 各个视图窗口
-│   │   ├── main_frame.py             # 主控面板：加载卡组/条件、选择策略、运行模拟
-│   │   ├── deck_editor_frame.py      # 卡组编辑器：加载并展示 YDK 内容、导出构筑
-│   │   ├── condition_editor_frame.py # 条件编辑器：加载 JSON、表格展示表达式/操作符/值
-│   │   ├── card_editor_frame.py      # 字段编辑器：搜索卡牌、查看字段、添加/修改/删除字段
-│   │   └── strategy_creator_frame.py # 策略构建器：组合多条件逻辑、保存为 JSON/脚本
-│   ├── widgets/                      # UI 组件库（可复用控件）
-│   ├── controller.py                # Controller：协调界面交互与服务调用
-│   └── main_window.py               # GUI 启动入口
-├── utils/                             # 工具层
-│   └── logger.py
-# 测试 & 资源
-├── test/                              # 测试模块
-│   └── ...
-├── 构筑
-│   ├── ...  #卡组文件
-├── 启动
-│   ├── ...  #条件文件
-├── modify_text.py                    # 文本工具模块
-├── README.md
-├── requirements.txt
-├── new_structure.md
-├── TODO.md
 
-```
+<details>
+<summary><strong>概率/</strong></summary>
 
+- `main.py`：主控入口脚本  
+
+### 📁 config/ 配置与工具
+- `settings.py`：配置路径、API 参数等
+
+### 📁 data/ 数据资源
+- `local_cards.csv`：本地卡牌数据文件，仅用于字段定义、ID-名称映射等
+
+### 📁 entity/ 模型层（Entity / Domain Models）
+- `card.py`：Card 模型类  
+- `condition.py`：Condition 模型类  
+- `composite_condition.py`：CompositeCondition 模型类  
+
+### 📁 parsers/ 数据解析器（Parser / Loader）
+- `__init__.py`  
+- `card_pool_parser.py`：解析卡组 TXT → `List[str]`（卡名）  
+- `condition_parser.py`：解析启动条件 TXT → `List[Condition]`（条件模型）  
+- `ydk_parser.py`：解析 YDK 文件 → `Tuple[List[str], List[str], List[str]]`  
+- `unified_loader.py`：统一入口，支持路径/文本解析（卡组/条件）
+
+### 📁 services/ 服务层（SOA Services）
+- `__init__.py`  
+- `simulation_service.py`：抽卡模拟器逻辑  
+- `parser_service.py`：封装解析服务接口  
+- `ydk_service.py`：YDK 卡组服务（解析+中文转换）  
+- `local_db_service.py`：本地卡池字段匹配、缓存、刷新服务
+
+### 📁 repositories/ 数据访问层（DAO / Repository）
+- `card_repository.py`：LocalCardDB 实现
+
+### 📁 engine/ 模拟核心引擎
+- `__init__.py`  
+- `probability_engine.py`：抽卡模拟主逻辑  
+- `strategy_rules.py`：封装策略规则（如“壶”、“暗抽”、“自奏”等）
+
+### 📁 gui/ 前端界面层（MVC: View + Controller）
+#### 📁 frames/
+- `main_frame.py`：主控面板  
+- `deck_editor_frame.py`：卡组编辑器  
+- `condition_editor_frame.py`：条件编辑器  
+- `card_editor_frame.py`：字段编辑器  
+- `strategy_creator_frame.py`：策略构建器  
+
+#### 📁 widgets/
+- 可复用 UI 控件集合
+
+- `controller.py`：控制器，协调 GUI 与服务交互  
+- `main_window.py`：GUI 启动入口
+
+### 📁 utils/ 工具层
+- `logger.py`：日志工具模块
+
+### 📁 test/ 测试模块
+- `...`：单元测试、集成测试脚本
+
+### 📁 构筑/
+- 卡组构筑文件（YDK/TXT）
+
+### 📁 启动/
+- 启动条件文件（JSON/TXT）
+
+### 📄 其他文件
+- `modify_text.py`：文本处理工具  
+- `README.md`：项目说明  
+- `requirements.txt`：Python 依赖列表  
+- `new_structure.md`：结构说明文档  
+- `TODO.md`：待办事项
+
+</details>
