@@ -4,6 +4,13 @@ import os
 from typing import List, Dict, Set
 from config.settings import CSV_FILE, CSV_HEADERS
 
+def refresh_database():
+    """
+    全局函数：刷新本地卡牌数据库缓存。
+    可供外部（如菜单项、命令行工具）调用。
+    """
+    db = LocalCardDB()
+    db.refresh()
 
 class LocalCardDB:
     def __init__(self):

@@ -30,7 +30,12 @@
 │   └── strategy_rules.py             # 封装“壶”、“暗抽”、“自奏”等策略
 ├── gui/                               # 前端界面（MVC: View + Controller）
 │   ├── frames/                       # 各个视图窗口
-│   ├── widgets/                      # UI 组件
+│   │   ├── main_frame.py             # 主控面板：加载卡组/条件、选择策略、运行模拟
+│   │   ├── deck_editor_frame.py      # 卡组编辑器：加载并展示 YDK 内容、导出构筑
+│   │   ├── condition_editor_frame.py # 条件编辑器：加载 JSON、表格展示表达式/操作符/值
+│   │   ├── card_editor_frame.py      # 字段编辑器：搜索卡牌、查看字段、添加/修改/删除字段
+│   │   └── strategy_creator_frame.py # 策略构建器：组合多条件逻辑、保存为 JSON/脚本
+│   ├── widgets/                      # UI 组件库（可复用控件）
 │   ├── controller.py                # Controller：协调界面交互与服务调用
 │   └── main_window.py               # GUI 启动入口
 ├── utils/                             # 工具层
@@ -44,7 +49,8 @@
 ├── modify_text.py                    # 文本工具模块
 ├── README.md
 ├── requirements.txt
-├── structure.md
+├── new_structure.md
 ├── TODO.md
-└── 我的架构.txt
+
 ```
+

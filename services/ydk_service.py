@@ -6,8 +6,8 @@ from utils.file_utils import write_to_file
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from collections import defaultdict
-import re
-from typing import Dict, List
+import re,os
+from typing import Dict, List,Union
 from parsers.ydk_parser import clean_card_name
 
 
@@ -147,19 +147,46 @@ def batch_fetch_missing(ids: List[str]):
             db.save_new_cards(new_cards)
 
 
-def load_ydk_file(file_path: str, field_tag: str = None) -> List[str]:
-    ensure_hand_traps_loaded()
-    with open(file_path, 'r', encoding='utf-8') as f:
-        ydk_content = f.read()
-    main_ids, _, _ = parse_ydk_text(ydk_content)
-    batch_fetch_missing(main_ids)
+def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_tag: str = None) -> List[str]:
+    """
+    加载并解析 YDK 数据，返回主卡组的卡牌名称列表。
 
-    # 获取并更新字段信息
-    unique_ids = sorted(set(main_ids), key=int)
-    if field_tag:
-        db.update_cards_field(unique_ids, field_tag)  # 调用 LocalCardDB 的新方法
+    参数:
+        source (Union[str, PathLike]): 文件路径 或 纯文本内容
+        is_path (bool): 是否是文件路径
+        field_tag (str): 字段标签（如“手坑”），用于数据库更新
 
-    return [clean_card_name(db.get_card_name(cid)) for cid in unique_ids]
+    返回:
+        List[str]: 卡牌名称列表
+    """
+    try:
+        # 统一读取文本内容
+        if is_path:
+            with open(source, 'r', encoding='utf-8') as f:
+                ydk_content = f.read()
+        else:
+            ydk_content = source.strip()
+
+        # 解析 YDK 内容
+        main_ids, _, _ = parse_ydk_text(ydk_content)
+
+        # 补全缺失卡牌数据
+        batch_fetch_missing(main_ids)
+
+        # 更新字段信息（可选）
+        unique_ids = sorted(set(main_ids), key=int)
+        if field_tag:
+            db.update_cards_field(unique_ids, field_tag)
+
+        # 返回卡牌名称列表
+        return [clean_card_name(db.get_card_name(cid)) for cid in unique_ids]
+
+    except Exception as e:
+        print(f"[ERROR] 加载或解析 YDK 数据失败: {e}")
+        return []
+
+
+
 
 def export_to_txt(main_ids: List[str], extra_ids: List[str], side_ids: List[str], output_file: str = None):
 
