@@ -111,14 +111,12 @@ class MainFrame(ttk.Frame):
 
     def run_simulation(self):
         try:
-            prob = self.controller.run_simulation(
+            prob, summary = self.controller.run_simulation(
                 draw_size=self.draw_size_var.get(),
                 num_draws=self.num_draws_var.get()
             )
-            if prob is not None:
-                self.log_output.insert(tk.END, f"[RESULT] 满足条件概率：{prob:.2%}\n")
-            else:
-                self.log_output.insert(tk.END, "[WARN] 未能计算出概率\n")
+            self.log_output.insert(tk.END, f"[RESULT] 满足条件概率：{prob:.2%}\n")
+            self.log_output.insert(tk.END, summary + "\n")
         except Exception as e:
             messagebox.showerror("错误", str(e))
 

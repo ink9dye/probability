@@ -4,7 +4,7 @@ from services.deck_service import get_deck
 from services.condition_service import get_conditions
 from services.simulation_service import run_simulation,simulate_draws,summarize_results
 from services.local_db_service import LocalCardDB
-from typing import List, Union, Set, Dict
+from typing import List, Union, Set, Dict,Tuple
 import os
 
 
@@ -48,7 +48,7 @@ class AppController:
             raise RuntimeError(f"条件加载失败: {e}")
 
     # ✅ 执行模拟
-    def run_simulation(self, draw_size=5, num_draws=100000, snapshot_interval=20000) -> float:
+    def run_simulation(self, draw_size=5, num_draws=100000, snapshot_interval=20000) -> Tuple[float, str]:
         if not self.card_pool or not self.condition_data:
             raise RuntimeError("缺少卡组或条件数据，无法模拟")
 
@@ -61,17 +61,15 @@ class AppController:
             titles=self.titles
         )
 
-        # ✅ 可选：打印分析报告
-        summarize_results(
+        summary = summarize_results(
             matched_indices=matched_indices,
             titles=self.titles,
             total_conditions=len(self.condition_data),
             conditions=self.condition_data
         )
 
-        # ✅ 实际返回概率（用于 GUI 展示）
         hit_count = sum(1 for i in matched_indices if i is not None)
-        return hit_count / len(matched_indices) if matched_indices else 0.0
+        return hit_count / len(matched_indices), summary
 
     def _get_cids_from_names(self, card_names: List[str]) -> List[str]:
         name_to_id = {v: k for k, v in self.db.id_name_map.items()}
