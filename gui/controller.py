@@ -48,28 +48,23 @@ class AppController:
             raise RuntimeError(f"条件加载失败: {e}")
 
     # ✅ 执行模拟
-    def run_simulation(self, draw_size=5, num_draws=100000, snapshot_interval=20000) -> Tuple[float, str]:
+    def run_simulation(self, draw_size=5, num_draws=100000, snapshot_interval=20000, callback=None) -> tuple[
+        float, str]:
         if not self.card_pool or not self.condition_data:
             raise RuntimeError("缺少卡组或条件数据，无法模拟")
 
-        matched_indices, _ = simulate_draws(
+        from services.simulation_service import run_simulation as service_run_simulation
+
+        # 只负责参数转发
+        return service_run_simulation(
             card_pool=self.card_pool,
             conditions=self.condition_data,
             draw_size=draw_size,
             num_draws=num_draws,
             snapshot_interval=snapshot_interval,
-            titles=self.titles
-        )
-
-        summary = summarize_results(
-            matched_indices=matched_indices,
             titles=self.titles,
-            total_conditions=len(self.condition_data),
-            conditions=self.condition_data
+            callback=callback
         )
-
-        hit_count = sum(1 for i in matched_indices if i is not None)
-        return hit_count / len(matched_indices), summary
 
     def _get_cids_from_names(self, card_names: List[str]) -> List[str]:
         name_to_id = {v: k for k, v in self.db.id_name_map.items()}

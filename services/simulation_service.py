@@ -1,5 +1,5 @@
 # services/simulation_service.py
-from engine.probability_engine import simulate_draws, summarize_results
+from engine.probability_engine import simulate_draws
 from engine.strategy_rules import apply_all_strategies
 from typing import List, Tuple
 from entity.condition import Condition
@@ -7,7 +7,7 @@ from entity.composite_condition import CompositeCondition
 import io
 import sys
 
-def run_simulation(card_pool, conditions, draw_size, num_draws, snapshot_interval, titles):
+def run_simulation(card_pool, conditions, draw_size, num_draws, snapshot_interval, titles, callback=None):
     """
     主模拟接口（service 层）：
     - 运行模拟抽卡；
@@ -26,16 +26,25 @@ def run_simulation(card_pool, conditions, draw_size, num_draws, snapshot_interva
         snapshot_interval=snapshot_interval
     )
 
-    # 计算详细输出
-    buf = io.StringIO()
-    sys_stdout = sys.stdout
-    sys.stdout = buf
-    try:
-        summarize_results(matched_indices, titles, len(conditions), conditions)
-    finally:
-        sys.stdout = sys_stdout  # 确保恢复 stdout
+    # 若指定了回调，则实时输出每轮抽卡快照
+    if callback:
+        for draw_num, hand_names, matched_cond in snapshots:
+            if matched_cond is not None:
+                try:
+                    idx = conditions.index(matched_cond) + 1
+                    line = f"第 {draw_num} 抽: {hand_names} ⇒ 满足条件 {idx}"
+                except ValueError:
+                    line = f"第 {draw_num} 抽: {hand_names} ⇒ 满足条件（未知条件）"
+            else:
+                line = f"第 {draw_num} 抽: {hand_names} ⇒ 无匹配"
+            callback(line)
 
-    summary_text = buf.getvalue()
+    summary_text = summarize_results(
+        matched_indices=matched_indices,
+        titles=titles,
+        total_conditions=len(conditions),
+        conditions=conditions
+    )
     total_matches = sum(1 for idx in matched_indices if idx is not None)
     probability = total_matches / num_draws
 
@@ -64,7 +73,7 @@ def summarize_results(
         prob = count / total_draws
         total_hits += count
         summary = "，".join(str(c) for c in conditions[i].get_sub_conditions())
-        lines.append(f"情况{i+1} {title}: {summary} 的概率为 {prob:.2%}")
+        lines.append(f"条件{i+1} {title}: {summary} 的概率为 {prob:.2%}")
 
         cumulative += count
         is_last = (i == len(titles) - 1) or (titles[i + 1] != title)
@@ -72,7 +81,7 @@ def summarize_results(
             lines.append(f"直到{title} 的累计概率为: {cumulative / total_draws:.2%}")
             cumulative = 0
 
-    lines.append(f"所有情况的总概率为: {total_hits / total_draws:.2%}")
+    lines.append(f"所有条件的总概率为: {total_hits / total_draws:.2%}")
     return "\n".join(lines)
 
 def report_snapshots(snapshots: List[Tuple[int, List[str], List[Condition] | None]], conditions: List[List[Condition]]):
