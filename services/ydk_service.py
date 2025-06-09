@@ -1,6 +1,5 @@
 # services/ydk_service.py
 from parsers.ydk_parser import parse_ydk_text
-from services.local_db_service import LocalCardDB
 from config.settings import API_BASE
 from utils.file_utils import write_to_file
 from concurrent.futures import ThreadPoolExecutor
@@ -10,8 +9,9 @@ import re,os
 from typing import Dict, List,Union
 from parsers.ydk_parser import clean_card_name
 
+from services.local_db_service import get_local_db
 
-db = LocalCardDB()
+db = get_local_db()  # 使用单例模式获取唯一数据库实例
 
 
 def extract_field(types: str) -> str:
@@ -91,7 +91,7 @@ def process_raw_data(card_id: str, data: dict) -> Dict:
 
 def ensure_hand_traps_loaded():
     """
-    确保手坑卡组已加载并添加了“手坑”字段
+    确保手坑卡组已加载并添加了“手坑”字段。
     """
     hand_trap_file = "data/手坑.ydk"
 
@@ -107,7 +107,7 @@ def ensure_hand_traps_loaded():
     for cid in main_ids:
         if cid not in db.existing_ids:
             need_fetch.append(cid)
-        elif not db.has_field(cid, "手坑"):
+        elif "手坑" not in db.get_card_fields(cid):
             need_update.append(cid)
 
     # 1. 下载缺失卡牌数据
@@ -117,12 +117,18 @@ def ensure_hand_traps_loaded():
 
     # 2. 更新字段（包括刚下载的新卡）
     all_hand_trap_ids = sorted(set(main_ids), key=int)
-    db.update_cards_field(all_hand_trap_ids, "手坑")  # 自动去重判断
+    for cid in all_hand_trap_ids:
+        db.add_card_attribute(cid, "field", "手坑")
 
     print("✅ 手坑卡组已确保加载，并已添加“手坑”字段")
 
 
 def fetch_card(card_id: str):
+    """
+    根据卡牌 ID 请求远程 API 获取数据。
+    :param card_id: 卡牌 ID
+    :return: 包含 id、name、field 的字典 或 None
+    """
     try:
         resp = requests.get(f"{API_BASE}{card_id}", timeout=5)
         if resp.status_code == 200:
@@ -131,25 +137,34 @@ def fetch_card(card_id: str):
                 return process_raw_data(card_id, data)
             elif isinstance(data, list) and data and isinstance(data[0], dict):
                 return process_raw_data(card_id, data[0])
-    except Exception:
-        pass
-    return None
+    except Exception as e:
+        print(f"[ERROR] 获取卡牌 {card_id} 数据失败: {e}")
+        return None
 
 
 def batch_fetch_missing(ids: List[str]):
+    """
+    批量下载缺失卡牌数据，并保存进本地数据库。
+    :param ids: 缺失的卡牌 ID 列表
+    """
     missing = [cid for cid in ids if cid not in db.existing_ids]
     if not missing:
         return
+
+    print(f"🔍 发现 {len(missing)} 张未记录的卡牌，正在批量下载...")
+
     with ThreadPoolExecutor(max_workers=5) as executor:
-        results = executor.map(fetch_card, missing)
-        new_cards = [c for c in results if c]
-        if new_cards:
-            db.save_new_cards(new_cards)
+        results = list(executor.map(fetch_card, missing))
+
+    new_cards = [c for c in results if c]
+    if new_cards:
+        db.save_new_cards(new_cards)
 
 
 def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_tag: str = None) -> List[str]:
     """
     加载并解析 YDK 数据，返回主卡组的卡牌名称列表。
+    同时会自动补全缺失卡牌数据，并添加指定字段。
 
     参数:
         source (Union[str, PathLike]): 文件路径 或 纯文本内容
@@ -160,26 +175,19 @@ def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_t
         List[str]: 卡牌名称列表
     """
     try:
-        # 统一读取文本内容
-        if is_path:
-            with open(source, 'r', encoding='utf-8') as f:
-                ydk_content = f.read()
-        else:
-            ydk_content = source.strip()
+        ydk_content = open(source, 'r', encoding='utf-8').read() if is_path else source.strip()
 
-        # 解析 YDK 内容
-        main_ids, _, _ = parse_ydk_text(ydk_content)
+        main_ids, extra_ids, side_ids = parse_ydk_text(ydk_content)
 
-        # 补全缺失卡牌数据
-        batch_fetch_missing(main_ids)
+        all_ids = main_ids + extra_ids + side_ids
+        batch_fetch_missing(all_ids)
 
-        # 更新字段信息（可选）
-        unique_ids = sorted(set(main_ids), key=int)
         if field_tag:
-            db.update_cards_field(unique_ids, field_tag)
+            unique_ids = sorted(set(all_ids), key=int)
+            for cid in unique_ids:
+                db.add_card_attribute(cid, "field", field_tag)
 
-        # 返回卡牌名称列表
-        return [clean_card_name(db.get_card_name(cid)) for cid in unique_ids]
+        return [clean_card_name(db.get_card_name(cid)) for cid in main_ids]
 
     except Exception as e:
         print(f"[ERROR] 加载或解析 YDK 数据失败: {e}")
@@ -189,17 +197,26 @@ def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_t
 
 
 def export_to_txt(main_ids: List[str], extra_ids: List[str], side_ids: List[str], output_file: str = None):
-
     ensure_hand_traps_loaded()
-    combined_ids = main_ids if main_ids else (extra_ids + side_ids)
+    combined_ids = main_ids  # ✅ 仅导出主卡组
     batch_fetch_missing(combined_ids)
+
     name_counter = defaultdict(int)
     for cid in combined_ids:
         name = db.get_card_name(cid).replace('“', '').replace('”', '')
         name_counter[name] += 1
+
     lines = ["#main"] + [f"{name}，{count}" for name, count in sorted(name_counter.items())]
-    result_path = write_to_file(lines, output_file or "我的构筑.txt", "构筑")
+
+    # 使用 resolve_path 构建正确路径
+    if output_file:
+        result_path = write_to_file(lines, output_file, "data", "构筑")
+    else:
+        result_path = write_to_file(lines, "征服斗魂构筑.txt", "data", "构筑")
+
     print(f"✅ 构筑文件已保存至：{result_path}")
+    print(f"[ydk_service] 数据库缓存大小: {len(db.id_attr_map)}")
+
 
 if __name__ == "__main__":
     # 测试用卡牌 ID

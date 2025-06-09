@@ -4,9 +4,11 @@ from parsers.ydk_parser import parse_ydk_text
 from services.ydk_service import batch_fetch_missing, export_to_txt
 from services.local_db_service import LocalCardDB
 import os
+from services.local_db_service import get_local_db
 
-# 初始化数据库
-db = LocalCardDB()
+db = get_local_db()
+
+
 
 
 def print_section(title: str, ids: list[str]):
@@ -91,7 +93,8 @@ if __name__ == "__main__":
 
     # 自动补全缺失卡牌
     batch_fetch_missing(all_ids)
-
+    db = get_local_db()  # 获取单例数据库
+    print(f"当前数据库缓存大小: {len(db.id_attr_map)}")  # 查看已加载卡
     # 显示卡组详情
     print_section("主卡组", main_ids)
     print_section("额外卡组", extra_ids)

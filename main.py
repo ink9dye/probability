@@ -1,31 +1,27 @@
-from core import file_read, probability
+# main.py
+
+import sys
+from PySide6.QtWidgets import QApplication
+from gui.main_window import MainWindow
 
 
 def main():
     """
-    主函数，负责协调整个流程。
+    应用程序主入口。
+    初始化 Qt 应用、主窗口，并进入主事件循环。
     """
-    # 定义文件路径
-    first_document_path = "构筑/征服斗魂构筑 .txt"
-    second_document_path = "构筑与启动/征服斗魂启动.txt"
+    app = QApplication(sys.argv)
 
-    # 读取文件内容
-    #卡组
-    first_document_content = file_read.read_file(first_document_path)
-    #启动
-    second_document_content = file_read.read_file(second_document_path)
-    #标题
-    title= file_read.get_comment_lines(second_document_path)
+    # 设置应用名称和组织信息（可选）
+    app.setApplicationName("游戏王卡组模拟器")
+    app.setOrganizationName("YGO Simulator Team")
 
-    # 如果有任何一个文件读取失败，则退出
-    if not first_document_content or not second_document_content:
-        return
+    # 创建主窗口并显示
+    main_window = MainWindow()
+    main_window.show()
 
-    # 解析文档内容
-    card_pool, conditions_list = file_read.parse_documents(first_document_content, second_document_content)
-
-    # 进行抽卡模拟并输出结果
-    probability.simulate_and_report(card_pool, conditions_list, title)
+    # 进入主事件循环
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

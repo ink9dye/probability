@@ -60,6 +60,60 @@ class LocalCardDB:
         self.load_existing_data()
         print("本地数据库已刷新")
 
+    def add_card(self, cid: str, name: str, fields: Optional[List[str]] = None) -> bool:
+        if cid in self.existing_ids:
+            print(f"🚫 卡牌 {cid} 已存在，跳过添加")
+            return False
+
+        self.existing_ids.add(cid)
+        self.id_attr_map[cid] = {
+            "id": cid,
+            "name": name,
+            "field": fields or []
+        }
+
+        self._save_updated_attributes([cid])
+        return True
+
+    def save_new_cards(self, cards: List[Dict]):
+        """
+        批量保存新获取的卡牌数据。
+        :param cards: 卡牌字典列表，每个元素包含 id、name、field 等字段
+        """
+        for card in cards:
+            cid = card.get("id")
+            name = card.get("name", "")
+            fields = card.get("field", "").split("、") if isinstance(card.get("field"), str) else card.get("field", [])
+            self.add_card(cid=cid, name=name, fields=fields)
+        print(f"✅ 已新增 {len(cards)} 张卡牌")
+
+    def delete_card(self, cid: str) -> bool:
+        """
+        删除指定卡牌记录。
+        :param cid: 卡牌 ID
+        :return: 删除成功返回 True，不存在返回 False
+        """
+        if cid not in self.existing_ids:
+            return False
+
+        self.existing_ids.remove(cid)
+        self.id_attr_map.pop(cid, None)
+
+        # 从 CSV 中移除记录
+        all_data = []
+        if os.path.exists(CSV_FILE):
+            with open(CSV_FILE, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                all_data = [row for row in reader if row.get("id") != cid]
+
+        with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
+            writer.writeheader()
+            writer.writerows(all_data)
+
+        print(f"🗑️ 卡牌 {cid} 已删除")
+        return True
+
     def get_card_name(self, cid: str) -> str:
         """
         根据卡牌 ID 获取卡牌名称，若未加载则自动刷新。
@@ -205,7 +259,8 @@ class LocalCardDB:
 
     def _save_updated_attributes(self, updated_cids: List[str]):
         """
-        将指定卡牌的属性变更保存回 CSV 文件
+        将指定卡牌的属性变更保存回 CSV 文件。
+        支持新增记录。
         """
         if not updated_cids:
             return
@@ -219,18 +274,19 @@ class LocalCardDB:
         data_map = {item['id']: item for item in all_data}
 
         for cid in updated_cids:
-            if cid in data_map:
-                original = data_map[cid]
-                updated = self.id_attr_map.get(cid, {})
-                for key in CSV_HEADERS:
-                    if key in updated:
-                        val = updated[key]
-                        if key == "field":
-                            data_map[cid][key] = "、".join(val) if isinstance(val, list) else val
-                        else:
-                            data_map[cid][key] = val
+            updated = self.id_attr_map.get(cid, {})
+            if not updated:
+                continue
 
-        # 排序写回（按 id 升序）
+            new_row = {}
+            for key in CSV_HEADERS:
+                val = updated.get(key, "")
+                if key == "field" and isinstance(val, list):
+                    val = "、".join(val)
+                new_row[key] = val
+
+            data_map[cid] = new_row  # ✅ 无论是否存在，直接插入或覆盖
+
         sorted_data = sorted(data_map.values(), key=lambda x: int(x['id']))
 
         with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
@@ -238,4 +294,4 @@ class LocalCardDB:
             writer.writeheader()
             writer.writerows(sorted_data)
 
-        print(f"✅ 已更新 {len(updated_cids)} 张卡牌的字段信息")
+        print(f"✅ 已写入 {len(updated_cids)} 张卡牌（支持新增）")
