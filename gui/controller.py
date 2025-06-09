@@ -1,10 +1,12 @@
+
 from services.ydk_service import load_ydk_file, export_to_txt
 from services.deck_service import get_deck
 from services.condition_service import get_conditions
-from services.simulation_service import run_simulation
+from services.simulation_service import run_simulation,simulate_draws,summarize_results
 from services.local_db_service import LocalCardDB
 from typing import List, Union, Set, Dict
 import os
+
 
 class AppController:
     def __init__(self, main_window=None):
@@ -14,13 +16,14 @@ class AppController:
         self.titles = []
         self.db = LocalCardDB()
 
-    # ✅ 加载 YDK（卡组码），并导出为 TXT 构筑
-    def load_ydk(self, source: Union[str, os.PathLike], field_tag: str = None) -> List[str]:
+    # ✅ 加载 YDK（文件或文本）
+    def load_ydk(self, source: Union[str, os.PathLike], is_path: bool = True, field_tag: str = None) -> List[str]:
         try:
-            card_names = load_ydk_file(source, field_tag=field_tag)
+            ydk_text = open(source, encoding='utf-8').read() if is_path else source
+            card_names = load_ydk_file(ydk_text, field_tag=field_tag, is_path=False)
             return card_names
         except Exception as e:
-            raise RuntimeError(f"加载 YDK 文件失败: {e}")
+            raise RuntimeError(f"加载 YDK 失败: {e}")
 
     def export_current_deck(self, output_file: str = None) -> None:
         if not self.card_pool:
@@ -28,7 +31,7 @@ class AppController:
         main_ids = self._get_cids_from_names(self.card_pool)
         export_to_txt(main_ids, [], [], output_file=output_file)
 
-    # ✅ 加载 TXT 构筑（用于模拟）
+    # ✅ 加载 TXT（支持路径或文本）
     def load_deck_txt(self, source: Union[str, os.PathLike], is_path: bool = True) -> List[str]:
         try:
             self.card_pool = get_deck(source, is_ydk=False, is_path=is_path)
@@ -36,12 +39,10 @@ class AppController:
         except Exception as e:
             raise RuntimeError(f"加载构筑失败: {e}")
 
-    # ✅ 加载条件 TXT
+    # ✅ 加载条件 TXT（支持路径或文本）
     def load_condition_txt(self, source: Union[str, os.PathLike], is_path: bool = True) -> List:
         try:
-            result = get_conditions(source, is_path=is_path)
-            self.condition_data = result.conditions
-            self.titles = result.titles
+            self.condition_data, self.titles = get_conditions(source, is_path=is_path)
             return self.condition_data
         except Exception as e:
             raise RuntimeError(f"条件加载失败: {e}")
@@ -50,7 +51,8 @@ class AppController:
     def run_simulation(self, draw_size=5, num_draws=100000, snapshot_interval=20000) -> float:
         if not self.card_pool or not self.condition_data:
             raise RuntimeError("缺少卡组或条件数据，无法模拟")
-        return run_simulation(
+
+        matched_indices, _ = simulate_draws(
             card_pool=self.card_pool,
             conditions=self.condition_data,
             draw_size=draw_size,
@@ -59,12 +61,22 @@ class AppController:
             titles=self.titles
         )
 
-    # ✅ 卡名 → 卡ID
+        # ✅ 可选：打印分析报告
+        summarize_results(
+            matched_indices=matched_indices,
+            titles=self.titles,
+            total_conditions=len(self.condition_data),
+            conditions=self.condition_data
+        )
+
+        # ✅ 实际返回概率（用于 GUI 展示）
+        hit_count = sum(1 for i in matched_indices if i is not None)
+        return hit_count / len(matched_indices) if matched_indices else 0.0
+
     def _get_cids_from_names(self, card_names: List[str]) -> List[str]:
         name_to_id = {v: k for k, v in self.db.id_name_map.items()}
         return [name_to_id[name] for name in card_names if name in name_to_id]
 
-    # ✅ 字段功能保留
     def add_field_to_cards(self, cids: List[str], field: str) -> None:
         self.db.update_cards_field(cids, field)
 
