@@ -1,7 +1,8 @@
 
 from services.ydk_service import load_ydk_file, export_to_txt
-from services.deck_service import get_deck
-from services.condition_service import get_conditions
+from services.parser_service import load_deck, load_conditions
+
+
 from services.simulation_service import run_simulation,simulate_draws,summarize_results
 from services.local_db_service import LocalCardDB
 from typing import List, Union, Set, Dict,Tuple
@@ -15,6 +16,8 @@ class AppController:
         self.condition_data = []
         self.titles = []
         self.db = LocalCardDB()
+
+
 
     # ✅ 加载 YDK（文件或文本）
     def load_ydk(self, source: Union[str, os.PathLike], is_path: bool = True, field_tag: str = None) -> List[str]:
@@ -34,7 +37,7 @@ class AppController:
     # ✅ 加载 TXT（支持路径或文本）
     def load_deck_txt(self, source: Union[str, os.PathLike], is_path: bool = True) -> List[str]:
         try:
-            self.card_pool = get_deck(source, is_ydk=False, is_path=is_path)
+            self.card_pool = load_deck(source, is_ydk=False, is_path=is_path)
             return self.card_pool
         except Exception as e:
             raise RuntimeError(f"加载构筑失败: {e}")
@@ -42,7 +45,7 @@ class AppController:
     # ✅ 加载条件 TXT（支持路径或文本）
     def load_condition_txt(self, source: Union[str, os.PathLike], is_path: bool = True) -> List:
         try:
-            self.condition_data, self.titles = get_conditions(source, is_path=is_path)
+            self.condition_data, self.titles = load_conditions(source, is_path=is_path)
             return self.condition_data
         except Exception as e:
             raise RuntimeError(f"条件加载失败: {e}")
