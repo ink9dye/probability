@@ -19,6 +19,7 @@ class CardEditorFrame(ttk.Frame):
         self.search_var = tk.StringVar()
         self.search_entry = ttk.Entry(self, textvariable=self.search_var)
         self.search_entry.pack(pady=5, fill=tk.X)
+        self.search_entry.bind("<Return>", lambda e: self.on_search())  # ← 新增绑定回车搜索
         self.search_button = ttk.Button(self, text="搜索", command=self.on_search)
         self.search_button.pack(pady=2, fill=tk.X)
 
