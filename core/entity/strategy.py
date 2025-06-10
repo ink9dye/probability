@@ -25,14 +25,24 @@ def get_all_strategies() -> List['Strategy']:
     return list(STRATEGY_REGISTRY.values())
 
 
-def apply_all_strategies(hand: List[str], pool: List[str]) -> List[str]:
+def apply_all_strategies(hand: List[str], pool: List[str], strategies: List['Strategy'] = None) -> List[str]:
     """
-    应用所有已注册的策略，按优先级排序执行
+    应用指定策略列表（或默认注册表），按优先级排序执行。
+    :param hand: 当前手牌
+    :param pool: 卡池
+    :param strategies: 可选策略列表（None 表示使用全局注册表）
     """
-    strategies = sorted(get_all_strategies(), key=lambda s: s.priority, reverse=True)
-    for strategy in strategies:
-        hand = strategy.apply(hand, pool)
+    if strategies is None:
+        strategies = get_all_strategies()
+
+    for strategy in sorted(strategies, key=lambda s: s.priority, reverse=True):
+        if strategy.enabled:
+            hand = strategy.apply(hand, pool)
+
     return hand
+
+
+
 
 class Strategy:
     def __init__(
@@ -43,7 +53,8 @@ class Strategy:
             action_func: Callable[[List[str], List[str]], List[str]],  # 行为函数：接受 hand 和 pool，返回新的 hand
             priority: int = 0,  # 策略优先级，数值越大越先执行
             tags: Optional[List[str]] = None,  # 可选的标签列表，用于分类或过滤策略
-            strategy_id: str = None  # 策略唯一 ID，可自定义，若为空则自动生成 UUID
+            strategy_id: str = None,  # 策略唯一 ID，可自定义，若为空则自动生成 UUID
+        enabled: bool = True  # 新增字段，默认启用
     ):
         """
         策略实体类：包含策略的基本信息、触发逻辑与行为逻辑。
@@ -63,7 +74,7 @@ class Strategy:
         self.action_func = action_func
         self.priority = priority
         self.tags = tags or []  # 如果未传 tags，则默认空列表
-
+        self.enabled = enabled  # 是否启用该策略
     def apply(self, hand: List[str], pool: List[str]) -> List[str]:
         """
         执行策略：如果条件函数返回 True，则执行行为函数；否则返回原手牌。

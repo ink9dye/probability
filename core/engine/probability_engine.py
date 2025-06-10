@@ -2,7 +2,6 @@
 
 import random
 from typing import List, Tuple, Optional  # ✅ 添加 Optional 导入
-
 from core.entity.composite_condition import CompositeCondition
 from core.entity.card import Card
 from services.local_db_service import LocalCardDB
