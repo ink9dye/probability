@@ -1,15 +1,19 @@
 # services/ydk_service.py
+
 from config.settings import API_BASE
 from utils.file_utils import write_to_file
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from collections import defaultdict
-import re,os
-from typing import Dict, List,Union
-from core.parsers.unified_loader import parse_ydk,clean_card_name
+import re
+import os
+from typing import Dict, List, Union
+
+from core.handlers import load_file, save_file
 from services.local_db_service import get_local_db
 
-db = get_local_db()  # 使用单例模式获取唯一数据库实例
+# 初始化 DB 实例
+db = get_local_db()
 
 
 def extract_field(types: str) -> str:
@@ -55,10 +59,6 @@ def extract_field(types: str) -> str:
         return ""
 
 
-
-
-
-
 def process_raw_data(card_id: str, data: dict) -> Dict:
     text_section = data.get("text", {})
     name = text_section.get("name", "")
@@ -94,30 +94,17 @@ def ensure_hand_traps_loaded():
     hand_trap_file = "data/手坑.ydk"
 
     try:
-        # 读取文件内容
-        with open(hand_trap_file, 'r', encoding='utf-8') as f:
-            ydk_content = f.read()
+        ydk_data = load_file(hand_trap_file, "ydk")
+        main_ids = ydk_data.get("main", [])
+        extra_ids = ydk_data.get("extra", [])
+        side_ids = ydk_data.get("side", [])
 
-        # ✅ 正确解析：is_path=False
-        main_ids, _, _ = parse_ydk(ydk_content, is_path=False)
-
-        # 分类处理：已存在 / 需要下载 / 需要加字段
-        need_fetch = []
-        need_update = []
-
-        for cid in main_ids:
-            if cid not in db.existing_ids:
-                need_fetch.append(cid)
-            elif "手坑" not in db.get_card_fields(cid):
-                need_update.append(cid)
-
-        # 下载缺失卡牌
+        need_fetch = [cid for cid in main_ids + extra_ids + side_ids if cid not in db.existing_ids]
         if need_fetch:
             print(f"🔍 发现 {len(need_fetch)} 张未记录的手坑卡牌，正在下载...")
             batch_fetch_missing(need_fetch)
 
-        # 更新字段
-        all_hand_trap_ids = sorted(set(main_ids), key=int)
+        all_hand_trap_ids = sorted(set(main_ids + extra_ids + side_ids), key=int)
         for cid in all_hand_trap_ids:
             db.add_card_attribute(cid, "field", "手坑")
 
@@ -178,10 +165,10 @@ def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_t
         List[str]: 卡牌名称列表
     """
     try:
-        print(f"ydk服务：路径是否：{is_path}")
-        ydk_content = open(source, 'r', encoding='utf-8').read() if is_path else source.strip()
-
-        main_ids, extra_ids, side_ids = parse_ydk(ydk_content,is_path)
+        ydk_data = load_file(source, "ydk")
+        main_ids = ydk_data.get("main", [])
+        extra_ids = ydk_data.get("extra", [])
+        side_ids = ydk_data.get("side", [])
 
         all_ids = main_ids + extra_ids + side_ids
         batch_fetch_missing(all_ids)
@@ -191,13 +178,11 @@ def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_t
             for cid in unique_ids:
                 db.add_card_attribute(cid, "field", field_tag)
 
-        return [clean_card_name(db.get_card_name(cid)) for cid in main_ids]
+        return [db.get_card_name(cid) for cid in main_ids]
 
     except Exception as e:
         print(f"[ERROR] 加载或解析 YDK 数据失败: {e}")
         return []
-
-
 
 
 def export_to_txt(main_ids: List[str], extra_ids: List[str], side_ids: List[str], output_file: str = None):

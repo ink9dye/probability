@@ -63,8 +63,9 @@ class DeckEditorFrame(QFrame):
             return
 
         try:
-            with open(path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # with open(path, 'r', encoding='utf-8') as f:
+            #     content = f.read()
+                content = "\n".join(self.controller.load_deck_txt(path))
                 self.editor.setPlainText(content)
                 self.file_entry.setText(path)
                 self.current_file = path

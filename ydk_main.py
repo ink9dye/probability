@@ -1,6 +1,6 @@
 # ydk_main.py
 
-from services.parser_service import load_ydk
+from services.file_service import load_ydk
 from services.ydk_service import batch_fetch_missing, export_to_txt
 from services.local_db_service import get_local_db
 

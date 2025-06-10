@@ -1,14 +1,19 @@
 # gui/controller.py
+
 import os
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtWidgets import QInputDialog
-from services.ydk_service import load_ydk_file, export_to_txt
-from services.parser_service import load_deck, load_conditions
+
+# ✅ 替换 parser_service 导入为 file_service
+from services.file_service import load_file, export_data, save_ydk
 from services.simulation_service import run_simulation as service_run_simulation
+from services.ydk_service import load_ydk_file, export_to_txt
 from services.local_db_service import get_local_db
+
 from typing import List, Union, Dict, Tuple, Set
-from services.write_service import export_data
+
 from config.settings import DECK_DIR, CONDITION_DIR
+
 
 class AppController:
     def __init__(self, main_window=None):
@@ -111,7 +116,9 @@ class AppController:
         :return: 卡组中的卡名列表
         """
         try:
-            self.card_pool = load_deck(source, is_ydk=False, is_path=is_path)
+            # ✅ 改用 file_service 接口
+            result = load_file(source, handler_type="deck", is_path=is_path)
+            self.card_pool = result
             return self.card_pool
         except Exception as e:
             self._show_error("加载失败", f"加载构筑失败: {e}")
@@ -126,8 +133,11 @@ class AppController:
         :return: 条件数据（多维列表）
         """
         try:
-            self.condition_data, self.titles = load_conditions(source, is_path=is_path)
-            return self.condition_data
+            # ✅ 改用 file_service 接口
+            result, titles = load_file(source, handler_type="condition", is_path=is_path)
+            self.condition_data = result
+            self.titles = titles
+            return result
         except Exception as e:
             self._show_error("加载失败", f"加载条件失败: {e}")
             return []

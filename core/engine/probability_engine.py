@@ -6,7 +6,7 @@ from typing import List, Tuple, Optional  # ✅ 添加 Optional 导入
 from core.entity.composite_condition import CompositeCondition
 from core.entity.card import Card
 from services.local_db_service import LocalCardDB
-from services.parser_service import clean_card_name
+from services.file_service import clean_card_name
 from core.entity.strategy import apply_all_strategies
 
 
@@ -27,7 +27,12 @@ def simulate_draws(
     snapshots = []
 
     db = LocalCardDB()
-    name_to_fields = {v: db.id_field_map[k] for k, v in db.id_name_map.items()}
+    name_to_fields = {}
+    for cid, data in db.id_attr_map.items():
+        card_name = data.get("name")
+        if card_name:
+            name_to_fields[card_name] = data.get("field", [])
+
     card_map = {}
     for name, fields in name_to_fields.items():
         clean_name = clean_card_name(name)
