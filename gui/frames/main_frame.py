@@ -50,18 +50,17 @@ class MainFrame(QWidget):
         self.setLayout(main_layout)
 
     def create_ydk_group(self):
-        """
-        创建卡组码导入区域（支持文件和剪贴板输入）。
-        """
         group_box = QGroupBox("导入卡组码（.ydk）")
         layout = QHBoxLayout()
 
         self.btn_load_ydk = QPushButton("选择 YDK 文件")
-        self.btn_clipboard = QPushButton("从剪贴板粘贴 YDK 文本")
+        self.ydk_input = QTextEdit()  # 新增：允许用户手动粘贴 YDK 内容
+        self.ydk_input.setPlaceholderText("在此处粘贴 YDK 格式内容")
+
         self.btn_export_txt = QPushButton("导出为 TXT 卡组")
 
         layout.addWidget(self.btn_load_ydk)
-        layout.addWidget(self.btn_clipboard)
+        layout.addWidget(self.ydk_input, stretch=3)
         layout.addWidget(self.btn_export_txt)
 
         group_box.setLayout(layout)
@@ -137,7 +136,6 @@ class MainFrame(QWidget):
         将界面组件的信号连接到对应的槽函数（控制逻辑）。
         """
         self.btn_load_ydk.clicked.connect(self.load_ydk_file)
-        self.btn_clipboard.clicked.connect(self.load_ydk_from_clipboard)
         self.btn_export_txt.clicked.connect(self.export_deck_txt)
         self.btn_select_deck.clicked.connect(self.load_txt_deck)
         self.btn_select_condition.clicked.connect(self.load_conditions)
@@ -156,24 +154,29 @@ class MainFrame(QWidget):
                 QMessageBox.critical(self, "错误", str(e))
 
     def load_ydk_from_clipboard(self):
-        """
-        从剪贴板中粘贴 YDK 文本并加载卡组。
-        """
         try:
-            clipboard = QApplication.clipboard()
-            ydk_text = clipboard.text()
+            ydk_text = self.ydk_input.toPlainText().strip()
+            if not ydk_text:
+                raise ValueError("请输入或粘贴 YDK 内容后再加载")
+
             card_names = self.controller.load_ydk(ydk_text, is_path=False)
-            self.log_output.append(f"[INFO] 从剪贴板加载了 {len(card_names)} 张卡牌（卡组码）\n")
+            self.log_output.append(f"[INFO] 从文本框加载了 {len(card_names)} 张卡牌（卡组码）\n")
         except Exception as e:
             QMessageBox.critical(self, "错误", str(e))
 
     def export_deck_txt(self):
-        """
-        将当前卡组导出为 TXT 文件。
-        """
         try:
+            ydk_text = self.ydk_input.toPlainText().strip()
+            if ydk_text:
+                card_names = self.controller.load_ydk(ydk_text, is_path=False)
+                if not card_names:
+                    raise ValueError("YDK 内容解析成功但返回空列表，请检查数据库状态")
+
+            if not self.controller.card_pool:
+                raise ValueError("当前卡组为空，无法导出")
+
             self.controller.export_current_deck()
-            QMessageBox.information(self, "导出完成", "卡组码已导出为 TXT 构筑")
+            # QMessageBox.information(self, "导出完成", "卡组码已导出为 TXT 构筑")
         except Exception as e:
             QMessageBox.critical(self, "错误", str(e))
 

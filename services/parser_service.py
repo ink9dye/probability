@@ -25,6 +25,7 @@ def load_ydk(source: Union[str, os.PathLike], is_path=True) -> tuple[list[str], 
     """
     加载 YDK 格式的主/额外/副卡组（ID 列表）
     """
+    print(f"提取服务：路径是否：{is_path}")
     return parse_ydk(source=source, is_path=is_path)
 
 def clean_card_name(name: str) -> str:

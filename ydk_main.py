@@ -1,6 +1,6 @@
 # ydk_main.py
 
-from core.parsers.unified_loader import parse_ydk_text
+from services.parser_service import load_ydk
 from services.ydk_service import batch_fetch_missing, export_to_txt
 from services.local_db_service import get_local_db
 
@@ -81,7 +81,7 @@ ydk_content = """
 
 if __name__ == "__main__":
     # 解析 YDK 内容
-    main_ids, extra_ids, side_ids = parse_ydk_text(ydk_content)
+    main_ids, extra_ids, side_ids = load_ydk(ydk_content,False)
     print(f"解析到卡牌分布: main[{len(main_ids)}], extra[{len(extra_ids)}], side[{len(side_ids)}]")
 
     # 获取所有卡牌 ID（含重复）

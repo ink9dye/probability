@@ -178,9 +178,10 @@ def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_t
         List[str]: 卡牌名称列表
     """
     try:
+        print(f"ydk服务：路径是否：{is_path}")
         ydk_content = open(source, 'r', encoding='utf-8').read() if is_path else source.strip()
 
-        main_ids, extra_ids, side_ids = parse_ydk(ydk_content)
+        main_ids, extra_ids, side_ids = parse_ydk(ydk_content,is_path)
 
         all_ids = main_ids + extra_ids + side_ids
         batch_fetch_missing(all_ids)

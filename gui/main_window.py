@@ -28,11 +28,11 @@ class MainWindow(QMainWindow):
 
         # 创建并添加主功能页面（模拟器界面）
         self.main_frame = MainFrame(controller=self.controller)
-        self.notebook.addTab(self.main_frame, "模拟器")
+        self.notebook.addTab(self.main_frame, "计算器")
 
         # 创建并添加字段管理页面（卡片属性编辑）
         self.card_editor_frame = CardEditorFrame(controller=self.controller)
-        self.notebook.addTab(self.card_editor_frame, "字段管理")
+        self.notebook.addTab(self.card_editor_frame, "本地卡片数据库")
 
         # 创建并添加字段管理页面（卡片属性编辑）
         self.condition_editor_frame = ConditionEditorFrame(controller=self.controller)

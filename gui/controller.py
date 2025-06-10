@@ -1,12 +1,13 @@
 # gui/controller.py
 import os
 from PySide6.QtWidgets import QMessageBox, QFileDialog
+from PySide6.QtWidgets import QInputDialog
 from services.ydk_service import load_ydk_file, export_to_txt
 from services.parser_service import load_deck, load_conditions
 from services.simulation_service import run_simulation as service_run_simulation
 from services.local_db_service import get_local_db
 from typing import List, Union, Dict, Tuple, Set
-from utils.file_utils import export_data
+from services.write_service import export_data
 
 class AppController:
     def __init__(self, main_window=None):
@@ -30,27 +31,39 @@ class AppController:
         :return: 加载出的卡牌名称列表
         """
         try:
-            ydk_text = open(source, encoding='utf-8').read() if is_path else source
-            card_names = load_ydk_file(ydk_text, field_tag=field_tag, is_path=False)
+            # 直接传递给服务层处理，由它决定是否读取文件
+            card_names = load_ydk_file(source=source, is_path=is_path, field_tag=field_tag)
+            self.card_pool = card_names
+            print("控制器：加载后的 card_pool:", self.card_pool)  # 调试输出
+            print(f"控制器：路径是否：{is_path}")
             return card_names
         except Exception as e:
             raise RuntimeError(f"加载 YDK 失败: {e}")
 
     # ✅ 导出当前卡组到 TXT
-    def export_current_deck(self, filename: str = "default_deck.txt", *subdirs) -> None:
+    def export_current_deck(self, file_name: str = None, *subdirs) -> None:
         """
         导出当前卡组到指定路径下的 TXT 文件。
-        :param filename: 文件名，默认为 default_deck.txt
-        :param *subdirs: 子目录路径（如 "构筑"）
+        如果未指定文件名，则弹窗让用户输入。
         """
         if not self.card_pool:
             self._show_error("导出失败", "当前卡组为空，无法导出")
             return
 
+        if file_name is None:
+            file_name, ok = QInputDialog.getText(
+                self.main_window,
+                "导出卡组",
+                "请输入文件名（不含扩展名）："
+            )
+            if not ok or not file_name:
+                return
+            file_name += ".txt"
+
         try:
-            # 使用统一导出接口
-            export_data(data=self.card_pool, filename=filename, data_type='deck', *subdirs)
-            self._show_info("成功", f"卡组已导出至 {filename}")
+            # 使用统一导出接口，并根据 data_type 自动选择目录
+            export_data(data=self.card_pool, file_name=file_name, data_type='deck')
+            self._show_info("成功", f"卡组已导出至 data/构筑/{file_name}")
         except Exception as e:
             self._show_error("导出失败", f"{e}")
 
