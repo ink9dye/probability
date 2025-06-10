@@ -50,3 +50,16 @@ def write_to_file(
 
     print(f"文件已写入：{file_path}")
     return file_path
+
+def read_from_file(file_path: str) -> str:
+    """
+    从指定路径读取文件内容。
+
+    :param file_path: 文件路径
+    :return: 文件内容字符串
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"找不到文件：{file_path}")
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return f.read()

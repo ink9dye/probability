@@ -1,0 +1,16 @@
+[
+    {
+        "name": "金满壶",
+        "description": "抽1/2张卡",
+        "condition": "lambda hand, pool: any('金满壶' in c for c in hand)",
+        "action": "lambda hand, pool: hand + draw_more(pool, hand, 2)",
+        "priority": 2
+    },
+    {
+        "name": "金谦壶",
+        "description": "选几？",
+        "condition": "lambda hand, pool: any('金谦壶' in c for c in hand)",
+        "action": "lambda hand, pool: apply_golden_qianhu(hand, pool)",
+        "priority": 1
+    }
+]
