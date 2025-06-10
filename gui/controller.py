@@ -1,6 +1,6 @@
 # gui/controller.py
 
-import os
+import os,json
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtWidgets import QInputDialog
 
@@ -9,8 +9,8 @@ from services.file_service import load_file, export_data, save_ydk
 from services.simulation_service import run_simulation as service_run_simulation
 from services.ydk_service import load_ydk_file, export_to_txt
 from services.local_db_service import get_local_db
-
-from typing import List, Union, Dict, Tuple, Set
+from services.strategy_service import get_local_strategy_db,Strategy
+from typing import List, Union, Dict, Tuple, Set,Optional
 
 from config.settings import DECK_DIR, CONDITION_DIR
 
@@ -25,7 +25,9 @@ class AppController:
         self.card_pool: List[str] = []  # 当前加载的卡组中的卡名列表
         self.condition_data = []       # 当前加载的模拟条件数据
         self.titles = []               # 条件对应的标题（列名）
-        self.db = get_local_db()       # 本地数据库服务实例
+        self.db = get_local_db()
+        self.strategy_db = get_local_strategy_db()
+        # 本地数据库服务实例
 
     # ✅ 加载 YDK 文件或文本
     def load_ydk(self, source: Union[str, os.PathLike], is_path: bool = True, field_tag: str = None) -> List[str]:
@@ -264,3 +266,46 @@ class AppController:
             return True
         except Exception as e:
             raise RuntimeError(f"保存失败: {e}")
+
+
+# 🎯 策略相关方法
+
+    def get_all_strategies(self) -> Dict[str, Strategy]:
+        """获取所有策略"""
+        return self.strategy_db.get_all_strategies()
+
+    def get_strategy(self, name: str) -> Optional[Strategy]:
+        """根据名称获取策略"""
+        return self.strategy_db.get_strategy(name)
+
+    def add_strategy(self, strategy: Strategy) -> bool:
+        """添加新策略"""
+        return self.strategy_db.add_strategy(strategy)
+
+    def update_strategy(self, strategy: Strategy) -> bool:
+        """更新已有策略"""
+        return self.strategy_db.update_strategy(strategy)
+
+    def delete_strategy(self, name: str) -> bool:
+        """删除指定策略"""
+        return self.strategy_db.delete_strategy(name)
+
+    def enable_strategy(self, name: str, enabled: bool = True) -> bool:
+        """启用策略"""
+        return self.strategy_db.enable_strategy(name, enabled)
+
+    def disable_strategy(self, name: str) -> bool:
+        """禁用策略"""
+        return self.strategy_db.disable_strategy(name)
+
+    def apply_strategy_to_hand(self, hand: List[str], pool: List[str], strategy_name: str) -> List[str]:
+        """应用指定策略到当前手牌"""
+        strategy = self.strategy_db.get_strategy(strategy_name)
+        if not strategy or not strategy.enabled:
+            return hand
+        return strategy.apply(hand, pool)
+
+    def refresh_strategy_db(self):
+        """刷新策略缓存"""
+        self.strategy_db.refresh()
+        self._show_info("刷新完成", "策略数据库已刷新")

@@ -12,7 +12,6 @@ def main():
     """
     app = QApplication(sys.argv)
 
-    # 设置应用名称和组织信息（可选）
     app.setApplicationName("游戏王卡组模拟器")
     app.setOrganizationName("YGO Simulator Team")
 

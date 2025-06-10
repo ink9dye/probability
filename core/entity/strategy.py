@@ -4,11 +4,16 @@ import uuid
 # 所有策略都注册在这里
 STRATEGY_REGISTRY = {}
 
+
+
+
 def register_strategy(name: str, strategy: 'Strategy'):
     """
     将策略注册到全局策略库中
     """
     STRATEGY_REGISTRY[name] = strategy
+
+
 
 
 def get_strategy(name: str) -> Optional['Strategy']:
@@ -25,19 +30,24 @@ def get_all_strategies() -> List['Strategy']:
     return list(STRATEGY_REGISTRY.values())
 
 
-def apply_all_strategies(hand: List[str], pool: List[str], strategies: List['Strategy'] = None) -> List[str]:
-    """
-    应用指定策略列表（或默认注册表），按优先级排序执行。
-    :param hand: 当前手牌
-    :param pool: 卡池
-    :param strategies: 可选策略列表（None 表示使用全局注册表）
-    """
+# core/entity/strategy.py
+
+def apply_all_strategies(
+    hand: List[str],
+    pool: List[str],
+    strategies: List['Strategy'] = None
+) -> List[str]:
     if strategies is None:
         strategies = get_all_strategies()
 
-    for strategy in sorted(strategies, key=lambda s: s.priority, reverse=True):
-        if strategy.enabled:
-            hand = strategy.apply(hand, pool)
+    # 数值越小越优先，升序排列
+    active_strategies = sorted(
+        (s for s in strategies if s.enabled),
+        key=lambda s: s.priority  # 默认升序排列
+    )
+
+    for strategy in active_strategies:
+        hand = strategy.apply(hand, pool)
 
     return hand
 
@@ -48,13 +58,12 @@ class Strategy:
     def __init__(
             self,
             name: str,  # 策略名称，例如 "金满壶"
-            description: str,  # 策略描述
             condition_func: Callable[[List[str], List[str]], bool],  # 条件函数：接受 hand 和 pool，返回布尔值
             action_func: Callable[[List[str], List[str]], List[str]],  # 行为函数：接受 hand 和 pool，返回新的 hand
-            priority: int = 0,  # 策略优先级，数值越大越先执行
-            tags: Optional[List[str]] = None,  # 可选的标签列表，用于分类或过滤策略
+            description: str = "",  # 策略描述
+            priority: int = 0,  # 策略优先级，数值越小越先执行
             strategy_id: str = None,  # 策略唯一 ID，可自定义，若为空则自动生成 UUID
-        enabled: bool = True  # 新增字段，默认启用
+        enabled: bool = True  # 是否启用，默认启用
     ):
         """
         策略实体类：包含策略的基本信息、触发逻辑与行为逻辑。
@@ -64,7 +73,6 @@ class Strategy:
         :param condition_func: 判断是否触发策略的函数，输入是手牌和卡池
         :param action_func: 触发后执行的操作函数，输入手牌和卡池，返回新手牌
         :param priority: 策略优先级（越高越早执行）
-        :param tags: 策略标签列表（如 ["抽卡", "检索"]）
         :param strategy_id: 唯一标识符，若未提供则使用 UUID 自动生成
         """
         self.strategy_id = strategy_id or str(uuid.uuid4())  # 如果没传 ID，就自动生成一个 UUID
@@ -72,8 +80,7 @@ class Strategy:
         self.description = description
         self.condition_func = condition_func
         self.action_func = action_func
-        self.priority = priority
-        self.tags = tags or []  # 如果未传 tags，则默认空列表
+        self.priority = priority if priority is not None else len(get_all_strategies())
         self.enabled = enabled  # 是否启用该策略
     def apply(self, hand: List[str], pool: List[str]) -> List[str]:
         """
@@ -100,7 +107,7 @@ class Strategy:
             "condition": self._serialize_function(self.condition_func),  # 以函数名形式保存
             "action": self._serialize_function(self.action_func),
             "priority": self.priority,
-            "tags": self.tags
+            "enabled": self.enabled
         }
 
     @staticmethod
@@ -135,7 +142,7 @@ class Strategy:
             condition_func=condition,
             action_func=action,
             priority=data["priority"],
-            tags=data.get("tags", [])
+            enabled=data.get("enabled", True)
         )
 
 

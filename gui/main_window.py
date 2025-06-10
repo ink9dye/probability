@@ -5,6 +5,8 @@ from gui.frames.main_frame import MainFrame
 from gui.frames.card_editor_frame import CardEditorFrame
 from gui.frames.condition_editor_frame import ConditionEditorFrame
 from gui.frames.deck_editor_frame import DeckEditorFrame
+from gui.frames.strategy_editor_frame import StrategyEditorFrame
+
 
 class MainWindow(QMainWindow):
     """
@@ -42,3 +44,22 @@ class MainWindow(QMainWindow):
         self.deck_editor_frame = DeckEditorFrame(controller=self.controller)
         self.notebook.addTab(self.deck_editor_frame, "卡组文件管理")
 
+        self.strategy_editor_frame = StrategyEditorFrame(controller=self.controller)  # ✅ 添加策略编辑器
+        self.notebook.addTab(self.strategy_editor_frame, "策略管理")  # ✅ 添加 Tab 页
+
+        # 创建菜单栏
+        self.create_menu_bar()
+
+    def create_menu_bar(self):
+        menubar = self.menuBar()
+
+        file_menu = menubar.addMenu("文件")
+        exit_action = QAction("退出", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+        help_menu = menubar.addMenu("帮助")
+        about_action = QAction("关于", self)
+        about_action.triggered.connect(
+            lambda: QMessageBox.about(self, "关于", "游戏王卡组模拟器 v1.0\n© 2025 阿里云 YGO 团队"))
+        help_menu.addAction(about_action)

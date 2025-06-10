@@ -4,6 +4,26 @@ import random
 
 from core.entity.strategy import Strategy, register_strategy
 
+
+from .factories import (
+    golden_manhu_condition_factory,
+    golden_manhu_action_factory,
+    golden_qianhu_condition_factory,
+    golden_qianhu_action_factory,
+    dark_draw_condition_factory,
+    dark_draw_action_factory,
+)
+
+STRATEGY_FUNCTION_REGISTRY = {
+    "golden_manhu_condition_factory": golden_manhu_condition_factory(),
+    "golden_manhu_action_factory": golden_manhu_action_factory(),
+    "golden_qianhu_condition_factory": golden_qianhu_condition_factory(),
+    "golden_qianhu_action_factory": golden_qianhu_action_factory(["赌魂", "螺禅", "博士", "苏", "手坑"], 6),
+    "dark_draw_condition_factory": dark_draw_condition_factory(["暗抽", "暗"], 2),
+    "dark_draw_action_factory": dark_draw_action_factory(2),
+}
+
+
 # 工具函数：从 pool 中排除已有的 hand，随机抽 count 张
 def draw_more(pool: List[str], exclude: List[str], count: int) -> List[str]:
     remaining = [c for c in pool if c not in exclude]
@@ -30,7 +50,6 @@ def create_golden_manhu_strategy(name: str = "金满壶", draw_count: int = 2) -
         condition_func=golden_manhu_condition_factory(),
         action_func=golden_manhu_action_factory(draw_count),
         priority=100,
-        tags=["抽卡"]
     )
 
 
@@ -70,7 +89,6 @@ def create_golden_qianhu_strategy(
         condition_func=golden_qianhu_condition_factory(required_card),
         action_func=golden_qianhu_action_factory(priority_fields, draw_count),
         priority=90,
-        tags=["检索", "抽卡"]
     )
 
 
@@ -96,7 +114,6 @@ dark_draw_strategy = Strategy(
     condition_func=dark_draw_condition_factory(["暗抽", "暗"], required_count=2),
     action_func=dark_draw_action_factory(2),
     priority=70,
-    tags=["抽卡", "暗抽"]
 )
 register_strategy("暗抽", dark_draw_strategy)
 
@@ -107,6 +124,5 @@ zizou_strategy = Strategy(
     condition_func=dark_draw_condition_factory(["主音", "自奏"], required_count=2),
     action_func=dark_draw_action_factory(2),
     priority=65,
-    tags=["抽卡", "自奏"]
 )
 register_strategy("自奏圣殿", zizou_strategy)

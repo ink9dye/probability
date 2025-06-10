@@ -4,9 +4,10 @@ import random
 from typing import List, Tuple, Optional  # ✅ 添加 Optional 导入
 from core.entity.composite_condition import CompositeCondition
 from core.entity.card import Card
+from core.entity.strategy import Strategy
 from services.local_db_service import LocalCardDB
 from services.file_service import clean_card_name
-from core.entity.strategy import apply_all_strategies
+from core.repositories.strategy_repository import get_local_strategy_db
 
 
 def check_conditions(cards: List[Card], condition: CompositeCondition) -> bool:
@@ -45,8 +46,7 @@ def simulate_draws(
             for strategy in sorted(strategies, key=lambda s: s.priority, reverse=True):
                 hand_names = strategy.apply(hand_names, card_pool)
         else:
-            hand_names = apply_all_strategies(hand_names, card_pool)
-
+            hand_names = get_local_strategy_db().apply_strategies(hand_names, card_pool)
         hand_cards = [card_map[name] for name in hand_names]
 
         matched_index = None
