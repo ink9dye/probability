@@ -1,48 +1,70 @@
+# gui/frames/main_frame.py
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QApplication, QHBoxLayout, QGroupBox, QPushButton,
     QLineEdit, QLabel, QSpinBox, QProgressBar, QTextEdit, QFileDialog, QMessageBox
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QObject, QThread
 from PySide6.QtGui import QClipboard
 from config.settings import CONDITION_DIR, DECK_DIR
 
+
+# ✅ 模拟任务类：封装运行逻辑
+class SimulationWorker(QObject):
+    log_signal = Signal(str)
+    result_ready = Signal(float, str)
+    finished = Signal()
+
+    def __init__(self, controller, draw_size, num_draws):
+        super().__init__()
+        self.controller = controller
+        self.draw_size = draw_size
+        self.num_draws = num_draws
+
+    def run(self):
+        try:
+            def callback(msg):
+                self.log_signal.emit(msg)
+
+            prob, report = self.controller.run_simulation(
+                draw_size=self.draw_size,
+                num_draws=self.num_draws,
+                callback=callback
+            )
+            self.result_ready.emit(prob, report)
+        except Exception as e:
+            self.log_signal.emit(f"[ERROR] {e}")
+        finally:
+            self.finished.emit()
+
+
+# ✅ 主界面类
 class MainFrame(QWidget):
-    """
-    模拟器主界面，集成卡组导入、条件加载、模拟执行等功能模块。
-    """
     def __init__(self, parent=None, controller=None):
         super().__init__(parent)
-        self.controller = controller  # 控制器对象：负责调用后端逻辑
+        self.controller = controller
 
-        self.deck_path = ""       # 当前选择的卡组文件路径
-        self.condition_path = ""  # 当前选择的条件文件路径
+        self.deck_path = ""
+        self.condition_path = ""
 
-        self.init_ui()            # 初始化界面布局
-        self.connect_signals()    # 绑定各按钮的信号与槽函数
+        self.init_ui()
+        self.connect_signals()
 
     def init_ui(self):
-        """
-        构建主界面的 UI 结构，分为多个 GroupBox 模块。
-        """
         main_layout = QVBoxLayout()
 
-        # 卡组码导入功能（.ydk -> 内存卡组）
         ydk_group = self.create_ydk_group()
         main_layout.addWidget(ydk_group)
 
-        # 构筑文件加载（.txt）
         deck_group = self.create_deck_group()
         main_layout.addWidget(deck_group)
 
-        # 启动条件文件加载（.txt）
         condition_group = self.create_condition_group()
         main_layout.addWidget(condition_group)
 
-        # 模拟执行设置区域
         simulate_group = self.create_simulation_group()
         main_layout.addWidget(simulate_group)
 
-        # 日志输出框（只读）
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         main_layout.addWidget(self.log_output)
@@ -132,48 +154,24 @@ class MainFrame(QWidget):
         return group_box
 
     def connect_signals(self):
-        """
-        将界面组件的信号连接到对应的槽函数（控制逻辑）。
-        """
         self.btn_load_ydk.clicked.connect(self.load_ydk_file)
         self.btn_export_txt.clicked.connect(self.export_deck_txt)
         self.btn_select_deck.clicked.connect(self.load_txt_deck)
         self.btn_select_condition.clicked.connect(self.load_conditions)
-        self.btn_start_simulate.clicked.connect(self.run_simulation_thread)
+        self.btn_start_simulate.clicked.connect(self.run_simulation)
 
     def load_ydk_file(self):
-        """
-        通过文件对话框选择 YDK 文件并加载，同时显示文件内容到文本框。
-        """
         path, _ = QFileDialog.getOpenFileName(self, "选择 YDK 文件", "", "YDK 文件 (*.ydk)")
         if not path:
             return
 
         try:
-            # 读取文件内容
-            with open(path, 'r', encoding='utf-8') as f:
-                ydk_content = f.read()
-
-            # 显示到文本框中
-            self.ydk_input.setPlainText(ydk_content)
-
-            # 调用控制器加载卡组
             card_names = self.controller.load_ydk(path)
+            self.ydk_input.setPlainText(path)
             self.log_output.append(f"[INFO] 加载了 {len(card_names)} 张卡牌（卡组码）\n")
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载 YDK 文件失败: {e}")
-
-    def load_ydk_from_clipboard(self):
-        try:
-            ydk_text = self.ydk_input.toPlainText().strip()
-            if not ydk_text:
-                raise ValueError("请输入或粘贴 YDK 内容后再加载")
-
-            card_names = self.controller.load_ydk(ydk_text, is_path=False)
-            self.log_output.append(f"[INFO] 从文本框加载了 {len(card_names)} 张卡牌（卡组码）\n")
-        except Exception as e:
-            QMessageBox.critical(self, "错误", str(e))
 
     def export_deck_txt(self):
         try:
@@ -187,32 +185,27 @@ class MainFrame(QWidget):
                 raise ValueError("当前卡组为空，无法导出")
 
             self.controller.export_current_deck()
-            # QMessageBox.information(self, "导出完成", "卡组码已导出为 TXT 构筑")
         except Exception as e:
             QMessageBox.critical(self, "错误", str(e))
 
     def load_txt_deck(self):
-        """
-        加载 TXT 格式的卡组构筑文件。
-        """
-        path, _ = QFileDialog.getOpenFileName(self, "选择卡组文件",DECK_DIR, "文本文件 (*.txt)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择卡组文件", DECK_DIR, "文本文件 (*.txt)"
+        )
         if path:
             self.deck_path = path
             self.deck_path_edit.setText(path)
             try:
-                self.controller.load_deck_txt(path)
+                self.controller.load_deck_txt(source=path, is_path=True)
                 self.log_output.append(f"[INFO] 加载构筑成功，共 {len(self.controller.card_pool)} 张卡牌\n")
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"加载卡组失败：{e}")
 
     def load_conditions(self):
-        """
-        加载 TXT 条件文件（用于模拟条件）。
-        """
         path, _ = QFileDialog.getOpenFileName(
             self,
             "选择条件文件",
-            CONDITION_DIR,  # 设置默认打开路径为 settings 中定义的条件目录
+            CONDITION_DIR,
             "文本文件 (*.txt)"
         )
         if path:
@@ -224,30 +217,39 @@ class MainFrame(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"加载条件失败：{e}")
 
-    def run_simulation_thread(self):
-        """
-        使用后台线程运行模拟，避免阻塞主线程。
-        """
-        from threading import Thread
-        thread = Thread(target=self.run_simulation)
-        thread.start()
-
     def run_simulation(self):
-        """
-        执行模拟操作，计算概率并输出日志。
-        """
-        try:
-            self.progress_bar.setMaximum(0)  # 设置为不确定模式（忙碌状态）
-            prob, report = self.controller.run_simulation(
-                draw_size=self.draw_size_spin.value(),
-                num_draws=self.num_draws_spin.value(),
-                callback=lambda msg: self.log_output.append(msg)
-            )
-            self.progress_bar.setMaximum(100)
-            self.progress_bar.setValue(0)
-            self.log_output.append(f"\n[RESULT] 所有情况的总概率为: {prob:.2%}\n")
-            self.log_output.append(report + "\n")
-        except Exception as e:
-            self.progress_bar.setMaximum(100)
-            self.progress_bar.setValue(0)
-            QMessageBox.critical(self, "错误", str(e))
+        # 禁用按钮防止重复点击
+        self.btn_start_simulate.setEnabled(False)
+        self.progress_bar.setMaximum(0)  # 设置为忙碌状态
+
+        # 创建线程和工作对象
+        self.thread = QThread()
+        self.worker = SimulationWorker(
+            self.controller,
+            draw_size=self.draw_size_spin.value(),
+            num_draws=self.num_draws_spin.value()
+        )
+
+        # 移动到线程中
+        self.worker.moveToThread(self.thread)
+
+        # 连接信号
+        self.thread.started.connect(self.worker.run)
+        self.worker.log_signal.connect(self.log_output.append)
+        self.worker.result_ready.connect(self.handle_result)
+        self.worker.finished.connect(self.on_simulation_finished)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        # 启动线程
+        self.thread.start()
+
+    def handle_result(self, prob, report):
+        self.log_output.append(f"\n[RESULT] 所有情况的总概率为: {prob:.2%}\n")
+        self.log_output.append(report + "\n")
+
+    def on_simulation_finished(self):
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(100)
+        self.btn_start_simulate.setEnabled(True)

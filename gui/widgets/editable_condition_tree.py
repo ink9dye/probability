@@ -2,7 +2,7 @@
 
 from gui.widgets.base_editable_tree import BaseEditableTree
 from PySide6.QtGui import QStandardItem
-
+from PySide6.QtWidgets import QFileDialog
 
 class EditableConditionTree(BaseEditableTree):
     def __init__(self, parent=None, controller=None):
@@ -42,3 +42,20 @@ class EditableConditionTree(BaseEditableTree):
             if expr or op or val:
                 rows.append([expr, op, val])
         return rows
+
+    def save_conditions(self, file_path: str = None):
+        """
+        保存条件数据到指定路径。
+        """
+        if not file_path:
+            file_path, _ = QFileDialog.getSaveFileName(self, "保存条件", "", "文本文件 (*.txt)")
+            if not file_path:
+                return False
+
+        try:
+            result = self.controller.export_condition_data(file_path, self.get_all_rows())
+            self.controller._show_info("成功", f"条件已保存至 {file_path}")
+            return True
+        except Exception as e:
+            self.controller._show_error("保存失败", f"{e}")
+            return False

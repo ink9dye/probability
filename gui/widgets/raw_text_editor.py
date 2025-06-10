@@ -1,4 +1,5 @@
 # gui/widgets/raw_text_editor.py
+
 from PySide6.QtWidgets import QTextEdit, QFileDialog
 from PySide6.QtCore import Qt
 

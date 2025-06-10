@@ -120,6 +120,6 @@ class BaseEditableTree(QWidget):
     def _show_confirm(self, title: str, message: str) -> bool:
         from PySide6.QtWidgets import QMessageBox
         reply = QMessageBox.question(self, title, message,
-                                     QMessageBox.Yes | QMessageBox.No,
-                                     QMessageBox.No)
+                                    QMessageBox.Yes | QMessageBox.No,
+                                    QMessageBox.No)
         return reply == QMessageBox.Yes
