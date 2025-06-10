@@ -1,6 +1,38 @@
 from typing import List, Callable, Dict, Any, Optional
 import uuid
 
+# 所有策略都注册在这里
+STRATEGY_REGISTRY = {}
+
+def register_strategy(name: str, strategy: 'Strategy'):
+    """
+    将策略注册到全局策略库中
+    """
+    STRATEGY_REGISTRY[name] = strategy
+
+
+def get_strategy(name: str) -> Optional['Strategy']:
+    """
+    获取已注册的策略
+    """
+    return STRATEGY_REGISTRY.get(name)
+
+
+def get_all_strategies() -> List['Strategy']:
+    """
+    获取所有已注册的策略
+    """
+    return list(STRATEGY_REGISTRY.values())
+
+
+def apply_all_strategies(hand: List[str], pool: List[str]) -> List[str]:
+    """
+    应用所有已注册的策略，按优先级排序执行
+    """
+    strategies = sorted(get_all_strategies(), key=lambda s: s.priority, reverse=True)
+    for strategy in strategies:
+        hand = strategy.apply(hand, pool)
+    return hand
 
 class Strategy:
     def __init__(
@@ -94,3 +126,6 @@ class Strategy:
             priority=data["priority"],
             tags=data.get("tags", [])
         )
+
+
+

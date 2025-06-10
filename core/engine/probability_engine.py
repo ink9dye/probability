@@ -4,9 +4,17 @@ from core.entity.composite_condition import CompositeCondition
 from core.entity.card import Card
 from services.local_db_service import LocalCardDB
 from services.parser_service import clean_card_name
-
+from core.engine.strategy_rules import apply_all_strategies
 def check_conditions(cards: List[Card], condition: CompositeCondition) -> bool:
     return condition.is_satisfied(cards)
+# core/engine/probability_engine.py
+
+from typing import List, Tuple
+from core.entity.composite_condition import CompositeCondition
+from core.entity.card import Card
+from services.local_db_service import LocalCardDB
+from services.parser_service import clean_card_name
+
 
 def simulate_draws(card_pool: List[str],
                    conditions: List[CompositeCondition],
@@ -26,6 +34,8 @@ def simulate_draws(card_pool: List[str],
 
     for draw_num in range(1, num_draws + 1):
         hand_names = random.sample(card_pool, draw_size)
+        hand_names = apply_all_strategies(hand_names, card_pool)  # ✅ 应用所有策略
+
         hand_cards = [card_map[name] for name in hand_names]
 
         matched_index = None
