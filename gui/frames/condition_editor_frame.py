@@ -6,6 +6,7 @@ import os
 from PySide6.QtWidgets import QFrame, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton
 from PySide6.QtCore import Qt
 from gui.widgets.raw_text_editor import RawTextEditor
+from config.settings import CONDITION_DIR
 
 
 class ConditionEditorFrame(QFrame):
@@ -13,7 +14,7 @@ class ConditionEditorFrame(QFrame):
         super().__init__(parent)
         self.controller = controller
         self.current_file = None
-        self.default_dir = "启动"  # 可改为 resolve_path("启动")
+        self.default_dir = CONDITION_DIR
         self.init_ui()
 
     def init_ui(self):

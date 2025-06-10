@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QClipboard
-
+from config.settings import CONDITION_DIR, DECK_DIR
 
 class MainFrame(QWidget):
     """
@@ -143,15 +143,26 @@ class MainFrame(QWidget):
 
     def load_ydk_file(self):
         """
-        通过文件对话框选择 YDK 文件并加载。
+        通过文件对话框选择 YDK 文件并加载，同时显示文件内容到文本框。
         """
         path, _ = QFileDialog.getOpenFileName(self, "选择 YDK 文件", "", "YDK 文件 (*.ydk)")
-        if path:
-            try:
-                card_names = self.controller.load_ydk(path)
-                self.log_output.append(f"[INFO] 加载了 {len(card_names)} 张卡牌（卡组码）\n")
-            except Exception as e:
-                QMessageBox.critical(self, "错误", str(e))
+        if not path:
+            return
+
+        try:
+            # 读取文件内容
+            with open(path, 'r', encoding='utf-8') as f:
+                ydk_content = f.read()
+
+            # 显示到文本框中
+            self.ydk_input.setPlainText(ydk_content)
+
+            # 调用控制器加载卡组
+            card_names = self.controller.load_ydk(path)
+            self.log_output.append(f"[INFO] 加载了 {len(card_names)} 张卡牌（卡组码）\n")
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"加载 YDK 文件失败: {e}")
 
     def load_ydk_from_clipboard(self):
         try:
@@ -184,7 +195,7 @@ class MainFrame(QWidget):
         """
         加载 TXT 格式的卡组构筑文件。
         """
-        path, _ = QFileDialog.getOpenFileName(self, "选择 TXT 文件", "", "文本文件 (*.txt)")
+        path, _ = QFileDialog.getOpenFileName(self, "选择卡组文件",DECK_DIR, "文本文件 (*.txt)")
         if path:
             self.deck_path = path
             self.deck_path_edit.setText(path)
@@ -198,7 +209,12 @@ class MainFrame(QWidget):
         """
         加载 TXT 条件文件（用于模拟条件）。
         """
-        path, _ = QFileDialog.getOpenFileName(self, "选择条件文件", "", "文本文件 (*.txt)")
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择条件文件",
+            CONDITION_DIR,  # 设置默认打开路径为 settings 中定义的条件目录
+            "文本文件 (*.txt)"
+        )
         if path:
             self.condition_path = path
             self.condition_path_edit.setText(path)

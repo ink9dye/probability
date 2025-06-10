@@ -19,9 +19,9 @@ def export_data(file_name: str, data_type: str, data, titles: list = None, *subd
     统一导出入口。用于导出 deck/condition 数据。
     """
     if data_type == "deck":
-        full_path = resolve_path("data", "构筑", file_name)
+        full_path = resolve_path(DECK_DIR, file_name)
     elif data_type == "condition":
-        full_path = resolve_path("data", "条件", file_name)
+        full_path = resolve_path(CONDITION_DIR, file_name)
     else:
         full_path = resolve_path(*subdirs, file_name)
 

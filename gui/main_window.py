@@ -4,6 +4,7 @@ from gui.controller import AppController
 from gui.frames.main_frame import MainFrame
 from gui.frames.card_editor_frame import CardEditorFrame
 from gui.frames.condition_editor_frame import ConditionEditorFrame
+from gui.frames.deck_editor_frame import DeckEditorFrame
 
 class MainWindow(QMainWindow):
     """
@@ -36,6 +37,8 @@ class MainWindow(QMainWindow):
 
         # 创建并添加字段管理页面（卡片属性编辑）
         self.condition_editor_frame = ConditionEditorFrame(controller=self.controller)
-        self.notebook.addTab(self.condition_editor_frame, "条件管理")
+        self.notebook.addTab(self.condition_editor_frame, "条件文件管理")
 
+        self.deck_editor_frame = DeckEditorFrame(controller=self.controller)
+        self.notebook.addTab(self.deck_editor_frame, "卡组文件管理")
 

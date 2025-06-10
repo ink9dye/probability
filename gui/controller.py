@@ -8,6 +8,7 @@ from services.simulation_service import run_simulation as service_run_simulation
 from services.local_db_service import get_local_db
 from typing import List, Union, Dict, Tuple, Set
 from services.write_service import export_data
+from config.settings import DECK_DIR, CONDITION_DIR
 
 class AppController:
     def __init__(self, main_window=None):
