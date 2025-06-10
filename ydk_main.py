@@ -1,9 +1,7 @@
 # ydk_main.py
 
-from parsers.ydk_parser import parse_ydk_text
+from core.parsers.unified_loader import parse_ydk_text
 from services.ydk_service import batch_fetch_missing, export_to_txt
-from services.local_db_service import LocalCardDB
-import os
 from services.local_db_service import get_local_db
 
 db = get_local_db()

@@ -6,6 +6,7 @@ from services.parser_service import load_deck, load_conditions
 from services.simulation_service import run_simulation as service_run_simulation
 from services.local_db_service import get_local_db
 from typing import List, Union, Dict, Tuple, Set
+from utils.file_utils import export_data
 
 class AppController:
     def __init__(self, main_window=None):
@@ -36,20 +37,42 @@ class AppController:
             raise RuntimeError(f"加载 YDK 失败: {e}")
 
     # ✅ 导出当前卡组到 TXT
-    def export_current_deck(self, output_file: str = None) -> None:
+    def export_current_deck(self, filename: str = "default_deck.txt", *subdirs) -> None:
         """
-        导出当前卡组到指定 TXT 文件。
-        :param output_file: 输出路径（如果为空则弹出文件选择框）
+        导出当前卡组到指定路径下的 TXT 文件。
+        :param filename: 文件名，默认为 default_deck.txt
+        :param *subdirs: 子目录路径（如 "构筑"）
         """
         if not self.card_pool:
             self._show_error("导出失败", "当前卡组为空，无法导出")
             return
 
-        main_ids = self._get_cids_from_names(self.card_pool)
         try:
-            export_to_txt(main_ids, [], [], output_file=output_file)
+            # 使用统一导出接口
+            export_data(data=self.card_pool, filename=filename, data_type='deck', *subdirs)
+            self._show_info("成功", f"卡组已导出至 {filename}")
         except Exception as e:
-            self._show_error("导出失败", f"导出错误: {e}")
+            self._show_error("导出失败", f"{e}")
+
+    def export_condition_data(self, filename: str = "default_conditions.txt", *subdirs) -> None:
+        """
+        导出当前条件数据到指定路径下的 TXT 文件。
+        """
+        if not self.condition_data:
+            self._show_error("导出失败", "没有可导出的条件数据")
+            return
+
+        try:
+            export_data(
+                data=self.condition_data,
+                filename=filename,
+                data_type='condition',
+                titles=self.titles,
+                *subdirs
+            )
+            self._show_info("成功", f"条件数据已导出至 {filename}")
+        except Exception as e:
+            self._show_error("导出失败", f"{e}")
 
     # ✅ 弹出信息提示框
     def _show_info(self, title: str, message: str):
@@ -204,3 +227,16 @@ class AppController:
         :return: 是否删除成功
         """
         return self.db.delete_card(cid)
+
+    def save_condition_data(self, file_path: str, data: list):
+        """
+        保存条件数据到指定路径
+        """
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                for cond in data:
+                    if len(cond) >= 3:
+                        f.write(f"{cond[0]},{cond[1]},{cond[2]}\n")
+            return True
+        except Exception as e:
+            raise RuntimeError(f"保存失败: {e}")

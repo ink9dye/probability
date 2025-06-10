@@ -1,7 +1,7 @@
 # condition_parser.py
 import re
-from entity.condition import Condition
-from entity.composite_condition import CompositeCondition
+from core.entity.condition import Condition
+from core.entity.composite_condition import CompositeCondition
 
 def normalize_operator(op: str) -> str:
     """兼容各种操作符表达形式（含中英文、符号写法）"""

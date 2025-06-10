@@ -1,5 +1,4 @@
 # services/ydk_service.py
-from parsers.ydk_parser import parse_ydk_text
 from config.settings import API_BASE
 from utils.file_utils import write_to_file
 from concurrent.futures import ThreadPoolExecutor
@@ -7,8 +6,7 @@ import requests
 from collections import defaultdict
 import re,os
 from typing import Dict, List,Union
-from parsers.ydk_parser import clean_card_name
-
+from core.parsers.unified_loader import parse_ydk,clean_card_name
 from services.local_db_service import get_local_db
 
 db = get_local_db()  # 使用单例模式获取唯一数据库实例
@@ -95,32 +93,37 @@ def ensure_hand_traps_loaded():
     """
     hand_trap_file = "data/手坑.ydk"
 
-    # 解析手坑文件中的卡牌 ID
-    with open(hand_trap_file, 'r', encoding='utf-8') as f:
-        ydk_content = f.read()
-    main_ids, _, _ = parse_ydk_text(ydk_content)
+    try:
+        # 读取文件内容
+        with open(hand_trap_file, 'r', encoding='utf-8') as f:
+            ydk_content = f.read()
 
-    # 分类处理：已存在 / 需要下载 / 需要加字段
-    need_fetch = []
-    need_update = []
+        # ✅ 正确解析：is_path=False
+        main_ids, _, _ = parse_ydk(ydk_content, is_path=False)
 
-    for cid in main_ids:
-        if cid not in db.existing_ids:
-            need_fetch.append(cid)
-        elif "手坑" not in db.get_card_fields(cid):
-            need_update.append(cid)
+        # 分类处理：已存在 / 需要下载 / 需要加字段
+        need_fetch = []
+        need_update = []
 
-    # 1. 下载缺失卡牌数据
-    if need_fetch:
-        print(f"🔍 发现 {len(need_fetch)} 张未记录的手坑卡牌，正在下载...")
-        batch_fetch_missing(need_fetch)
+        for cid in main_ids:
+            if cid not in db.existing_ids:
+                need_fetch.append(cid)
+            elif "手坑" not in db.get_card_fields(cid):
+                need_update.append(cid)
 
-    # 2. 更新字段（包括刚下载的新卡）
-    all_hand_trap_ids = sorted(set(main_ids), key=int)
-    for cid in all_hand_trap_ids:
-        db.add_card_attribute(cid, "field", "手坑")
+        # 下载缺失卡牌
+        if need_fetch:
+            print(f"🔍 发现 {len(need_fetch)} 张未记录的手坑卡牌，正在下载...")
+            batch_fetch_missing(need_fetch)
 
-    print("✅ 手坑卡组已确保加载，并已添加“手坑”字段")
+        # 更新字段
+        all_hand_trap_ids = sorted(set(main_ids), key=int)
+        for cid in all_hand_trap_ids:
+            db.add_card_attribute(cid, "field", "手坑")
+
+        print("✅ 手坑卡组已确保加载，并已添加“手坑”字段")
+    except Exception as e:
+        print(f"[ERROR] 手坑卡组加载失败: {e}")
 
 
 def fetch_card(card_id: str):
@@ -177,7 +180,7 @@ def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_t
     try:
         ydk_content = open(source, 'r', encoding='utf-8').read() if is_path else source.strip()
 
-        main_ids, extra_ids, side_ids = parse_ydk_text(ydk_content)
+        main_ids, extra_ids, side_ids = parse_ydk(ydk_content)
 
         all_ids = main_ids + extra_ids + side_ids
         batch_fetch_missing(all_ids)

@@ -1,11 +1,9 @@
 # services/simulation_service.py
-from engine.probability_engine import simulate_draws
-from engine.strategy_rules import apply_all_strategies
+from core.engine.probability_engine import simulate_draws
 from typing import List, Tuple
-from entity.condition import Condition
-from entity.composite_condition import CompositeCondition
-import io
-import sys
+from core.entity.condition import Condition
+from core.entity.composite_condition import CompositeCondition
+
 
 def run_simulation(card_pool, conditions, draw_size, num_draws, snapshot_interval, titles, callback=None):
     """

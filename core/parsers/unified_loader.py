@@ -10,7 +10,7 @@ def read_text(source: Union[str, os.PathLike], is_path=True) -> str:
             return f.read()
     return source
 
-def load_deck(source: Union[str, os.PathLike], is_ydk=False, is_path=True) -> list[str]:
+def parse_deck(source: Union[str, os.PathLike], is_ydk=False, is_path=True) -> list[str]:
     """
     加载并解析卡组列表，支持普通文本格式与 YDK 格式。
 
@@ -38,10 +38,24 @@ def load_deck(source: Union[str, os.PathLike], is_ydk=False, is_path=True) -> li
     # 否则，使用普通文本格式解析
     return parse_deck_text(text)
 
-def load_conditions(source: Union[str, os.PathLike], is_path=True):
+def parse_conditions(source: Union[str, os.PathLike], is_path=True):
     """
     加载条件组与注释标题（返回 tuple: List[List[Condition]], List[str]）
     注意：本模块不依赖 entity 层，返回值结构文档化而非类型标注
     """
     text = read_text(source, is_path)
     return parse_condition_text(text)
+
+def parse_ydk(source: Union[str, os.PathLike], is_path=True) -> tuple[list[str], list[str], list[str]]:
+    """
+    加载 YDK 格式的主/额外/副卡组（ID 列表）
+    """
+    text = read_text(source, is_path)
+    return parse_ydk_text(text)
+
+def clean_card_name(name: str) -> str:
+    """
+    清理卡牌名称中的中文引号、空格、单双引号等。
+    示例："“K9案件”" → "K9案件"
+    """
+    return name.strip().strip('“”"\'')

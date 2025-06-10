@@ -69,3 +69,18 @@ def write_to_file(
 
     print(f"✅ 文件已写入：{file_path}")
     return file_path
+
+def export_data(data, filename: str, data_type: str = 'deck', titles: list = None, *subdirs):
+    """
+    通用数据导出函数
+
+    示例：
+        export_data(deck_list, "双子构筑.txt", "deck", "构筑")
+        export_data(condition_list, "mls启动.txt", "condition", "启动", titles=["阶段", "描述", "要求"])
+    """
+    from services.write_service import save_data
+
+    file_path = resolve_path(*subdirs, filename)
+    save_data(file_path=file_path, data_type=data_type, data=data, titles=titles)
+    print(f"📦 已导出 {data_type} 至：{file_path}")
+    return file_path

@@ -1,11 +1,9 @@
 import random
-from collections import Counter, defaultdict
 from typing import List, Tuple
-from engine.strategy_rules import apply_all_strategies  # 若未用可移除
-from entity.composite_condition import CompositeCondition
-from entity.card import Card
+from core.entity.composite_condition import CompositeCondition
+from core.entity.card import Card
 from services.local_db_service import LocalCardDB
-from parsers.ydk_parser import clean_card_name
+from services.parser_service import clean_card_name
 
 def check_conditions(cards: List[Card], condition: CompositeCondition) -> bool:
     return condition.is_satisfied(cards)

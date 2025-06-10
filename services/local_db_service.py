@@ -1,5 +1,5 @@
 # services/local_db_service.py
-from repositories.card_repository import LocalCardDB
+from core.repositories.card_repository import LocalCardDB
 
 __db_instance = None
 

@@ -1,6 +1,7 @@
 # services/parser_service.py
-from parsers.unified_loader import load_deck as parse_deck
-from parsers.unified_loader import load_conditions as parse_conditions
+from core.parsers.unified_loader import parse_deck, parse_conditions, parse_ydk,clean_card_name
+
+
 from typing import Union
 import os
 
@@ -20,3 +21,15 @@ def load_conditions(source: Union[str, os.PathLike], is_path: bool = True):
     """
     return parse_conditions(source=source, is_path=is_path)
 
+def load_ydk(source: Union[str, os.PathLike], is_path=True) -> tuple[list[str], list[str], list[str]]:
+    """
+    加载 YDK 格式的主/额外/副卡组（ID 列表）
+    """
+    return parse_ydk(source=source, is_path=is_path)
+
+def clean_card_name(name: str) -> str:
+    """
+    清理卡牌名称中的中文引号、空格、单双引号等。
+    示例："“K9案件”" → "K9案件"
+    """
+    return clean_card_name(name=name)

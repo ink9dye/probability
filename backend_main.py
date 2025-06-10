@@ -1,7 +1,7 @@
 # backend_main.py
 
-from services.deck_service import get_deck
-from services.condition_service import get_conditions
+
+from services.parser_service import parse_condition,parse_deck
 from services.simulation_service import run_simulation
 
 def main():
@@ -10,10 +10,10 @@ def main():
     condition_path = "data/启动/征服斗魂启动.txt"
 
     # 加载卡池（按构筑文本解析）
-    card_pool = get_deck(deck_path, is_ydk=False, is_path=True)
+    card_pool = parse_deck(deck_path, is_ydk=False, is_path=True)
 
     # 加载条件与标题
-    conditions, titles = get_conditions(condition_path, is_path=True)
+    conditions, titles = parse_condition(condition_path, is_path=True)
 
     # 执行抽卡模拟并报告
     run_simulation(
