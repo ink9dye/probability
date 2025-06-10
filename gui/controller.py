@@ -9,7 +9,7 @@ from services.file_service import load_file, export_data, save_ydk
 from services.simulation_service import run_simulation as service_run_simulation
 from services.ydk_service import load_ydk_file, export_to_txt
 from services.local_db_service import get_local_db
-from services.strategy_service import get_local_strategy_db,Strategy
+from services.strategy_service import get_local_strategy_db
 from typing import List, Union, Dict, Tuple, Set,Optional
 
 from config.settings import DECK_DIR, CONDITION_DIR
@@ -270,42 +270,19 @@ class AppController:
 
 # 🎯 策略相关方法
 
-    def get_all_strategies(self) -> Dict[str, Strategy]:
-        """获取所有策略"""
+    # 策略相关方法
+
+    def get_all_strategies(self):
         return self.strategy_db.get_all_strategies()
 
-    def get_strategy(self, name: str) -> Optional[Strategy]:
-        """根据名称获取策略"""
+    def get_strategy(self, name: str):
         return self.strategy_db.get_strategy(name)
 
-    def add_strategy(self, strategy: Strategy) -> bool:
-        """添加新策略"""
-        return self.strategy_db.add_strategy(strategy)
-
-    def update_strategy(self, strategy: Strategy) -> bool:
-        """更新已有策略"""
-        return self.strategy_db.update_strategy(strategy)
-
-    def delete_strategy(self, name: str) -> bool:
-        """删除指定策略"""
-        return self.strategy_db.delete_strategy(name)
-
-    def enable_strategy(self, name: str, enabled: bool = True) -> bool:
-        """启用策略"""
+    def enable_strategy(self, name: str, enabled: bool = True):
         return self.strategy_db.enable_strategy(name, enabled)
 
-    def disable_strategy(self, name: str) -> bool:
-        """禁用策略"""
-        return self.strategy_db.disable_strategy(name)
+    def set_strategy_priority(self, name: str, priority: int):
+        return self.strategy_db.set_priority(name, priority)
 
-    def apply_strategy_to_hand(self, hand: List[str], pool: List[str], strategy_name: str) -> List[str]:
-        """应用指定策略到当前手牌"""
-        strategy = self.strategy_db.get_strategy(strategy_name)
-        if not strategy or not strategy.enabled:
-            return hand
-        return strategy.apply(hand, pool)
-
-    def refresh_strategy_db(self):
-        """刷新策略缓存"""
-        self.strategy_db.refresh()
-        self._show_info("刷新完成", "策略数据库已刷新")
+    def apply_strategies(self, hand, pool):
+        return self.strategy_db.apply_all(hand, pool)
