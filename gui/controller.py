@@ -159,11 +159,24 @@ class AppController:
             return 0.0, ""
 
         try:
-            # 获取当前策略配置（默认第一个）
-            strategy_config = self.strategy_configs[0] if hasattr(self,
-                                                                  'strategy_configs') and self.strategy_configs else None
+            # 如果没有设置 strategy_configs，则使用默认值
+            if not hasattr(self, 'strategy_configs') or not self.strategy_configs:
+                # 默认策略：全部关闭
+                strategy_config = {
+                    "golden_manhu_enabled": False,
+                    "golden_manhu_draw_count": 2,
+                    "golden_qianhu_enabled": False,
+                    "golden_qianhu_priority_fields": ["手坑"],
+                    "golden_qianhu_draw_count": 6,
+                    "dark_draw_enabled": False,
+                    "dark_draw_trigger_card": "暗之诱惑",
+                    "dark_draw_required_field": "暗属性"
+                }
+            else:
+                # 取第一个策略配置（目前只支持单个策略）
+                strategy_config = self.strategy_configs[0]
 
-            # 调用新的模拟服务
+            # 解包策略配置
             probability, summary = simulate_with_options(
                 card_pool=self.card_pool,
                 conditions=self.condition_data,
@@ -171,14 +184,23 @@ class AppController:
                 draw_size=draw_size,
                 num_draws=num_draws,
                 snapshot_interval=snapshot_interval,
-                strategy_config=strategy_config,  # 新增：传入策略配置
-                callback=callback  # 保留回调
+                callback=callback,
+
+                # 扁平策略参数
+                golden_manhu_enabled=getattr(strategy_config, "golden_manhu_enabled", False),
+                golden_manhu_draw_count=getattr(strategy_config, "golden_manhu_draw_count", 2),
+                golden_qianhu_enabled=getattr(strategy_config, "golden_qianhu_enabled", False),
+                golden_qianhu_priority_fields=getattr(strategy_config, "golden_qianhu_priority_fields", ["手坑"]),
+                golden_qianhu_draw_count=getattr(strategy_config, "golden_qianhu_draw_count", 6),
+                dark_draw_enabled=getattr(strategy_config, "dark_draw_enabled", False),
+                dark_draw_trigger_card=getattr(strategy_config, "dark_draw_trigger_card", "暗之诱惑"),
+                dark_draw_required_field=getattr(strategy_config, "dark_draw_required_field", "暗属性")
             )
 
             return probability, summary
 
         except Exception as e:
-            self._show_error(f"模拟失败: {e}")
+            self._show_error("模拟失败", str(e))
             return 0.0, ""
 
     # 🗃️ —— 与卡牌数据库交互的方法 —— #

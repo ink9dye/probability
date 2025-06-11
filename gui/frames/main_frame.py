@@ -1,10 +1,10 @@
+# main_frame.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox, QPushButton,
     QLineEdit, QLabel, QSpinBox, QProgressBar, QTextEdit, QFileDialog,
     QMessageBox, QListWidget, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QObject, QThread
-from config.settings import CONDITION_DIR, DECK_DIR
 
 
 class SimulationWorker(QObject):
@@ -140,6 +140,7 @@ class MainFrame(QWidget):
         layout.addWidget(self.chk_jinqian)
         layout.addLayout(jinqian_layout)
 
+        # 类暗抽
         self.chk_dark_draw = QCheckBox("启用类暗抽策略")
 
         dark_group = QGroupBox("暗抽配置")
@@ -159,6 +160,7 @@ class MainFrame(QWidget):
         dark_group.setLayout(dark_layout)
         layout.addWidget(self.chk_dark_draw)
         layout.addWidget(dark_group)
+
         group_box.setLayout(layout)
         return group_box
 
@@ -213,7 +215,7 @@ class MainFrame(QWidget):
         self.controller.export_current_deck()
 
     def load_txt_deck(self):
-        path, _ = QFileDialog.getOpenFileName(self, "选择卡组文件", DECK_DIR, "文本文件 (*.txt)")
+        path, _ = QFileDialog.getOpenFileName(self, "选择卡组文件", "data/构筑", "文本文件 (*.txt)")
         if path:
             self.deck_path = path
             self.deck_path_edit.setText(path)
@@ -221,7 +223,7 @@ class MainFrame(QWidget):
             self.log_output.append(f"[INFO] 加载构筑成功，共 {len(self.controller.card_pool)} 张卡牌\n")
 
     def load_conditions(self):
-        path, _ = QFileDialog.getOpenFileName(self, "选择条件文件", CONDITION_DIR, "文本文件 (*.txt)")
+        path, _ = QFileDialog.getOpenFileName(self, "选择条件文件", "data/条件", "文本文件 (*.txt)")
         if path:
             self.condition_path = path
             self.condition_path_edit.setText(path)
@@ -274,8 +276,8 @@ class MainFrame(QWidget):
         self.thread.start()
 
     def handle_result(self, prob, report):
-        self.log_output.append(f"\n[RESULT] 所有情况的总概率为: {prob:.2%}\n")
-        self.log_output.append(report + "\n")
+        self.log_output.append(f"[RESULT] 所有情况的总概率为: {prob:.2%}\n")
+        self.log_output.append(report)
 
     def on_simulation_finished(self):
         self.btn_start_simulate.setEnabled(True)

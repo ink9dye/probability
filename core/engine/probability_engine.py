@@ -110,7 +110,7 @@ def _generate_summary(matched_indices: List[Optional[int]], titles: List[str],
             counts[idx] += 1
 
     total_draws = len(matched_indices)
-    lines = ["\n分组优先级命中统计："]
+    lines = ["分组优先级命中统计："]
 
     cumulative = 0
     printed_titles = set()
@@ -237,6 +237,131 @@ def _worker_task(
                  start_idx, end_idx, len(matched_indices))
     return matched_indices
 
+def apply_strategies_flat(
+    hand_names: List[str],
+    pool: List[str],
+    # 策略参数
+    golden_manhu_enabled: bool = False,
+    golden_manhu_draw_count: int = 2,
+    golden_qianhu_enabled: bool = False,
+    golden_qianhu_priority_fields: List[str] = ("手坑",),
+    golden_qianhu_draw_count: int = 6,
+    dark_draw_enabled: bool = False,
+    dark_draw_trigger_card: str = "暗抽卡",
+    dark_draw_required_field: str = "暗属性"
+) -> List[str]:
+    """
+    根据扁平参数应用所有启用的策略
+    """
+    result = hand_names.copy()
+
+    # 构建字段映射表
+    db = LocalCardDB()
+    name_to_fields = {}
+    for cid, data in db.id_attr_map.items():
+        card_name = data.get("name")
+        if card_name:
+            name_to_fields[card_name] = data.get("field", [])
+
+    def get_fields(card_name: str) -> List[str]:
+        return name_to_fields.get(card_name, [])
+
+    # 金满壶策略
+    if golden_manhu_enabled:
+        if any("强欲而金满之壶" in get_fields(c) for c in result):
+            new_cards = draw_more(pool, result, golden_manhu_draw_count)
+            result.extend([c.replace("手坑", "手后坑") if "手坑" in c else c for c in new_cards])
+
+    # 金谦壶策略
+    if golden_qianhu_enabled:
+        if any("金满而谦虚之壶" in get_fields(c) for c in result):
+            new_cards = draw_more(pool, result, golden_qianhu_draw_count)
+            chosen = None
+            for p in golden_qianhu_priority_fields:
+                for c in new_cards:
+                    if p in get_fields(c):
+                        chosen = c.replace("手坑", "手后坑") if "手坑" in c else c
+                        break
+                if chosen:
+                    break
+            if not chosen and new_cards:
+                chosen = new_cards[0].replace("手坑", "手后坑") if "手坑" in new_cards[0] else "后置" + new_cards[0]
+            if chosen:
+                result.append(chosen)
+
+    # 类暗抽策略
+    if dark_draw_enabled:
+        has_trigger = any(dark_draw_trigger_card in get_fields(c) for c in result)
+        if has_trigger:
+            matched_card = next((c for c in result if dark_draw_trigger_card in get_fields(c)), None)
+            if matched_card and dark_draw_required_field in get_fields(matched_card):
+                new_cards = draw_more(pool, result, 2)
+                result.extend([c.replace("手坑", "手后坑") if "手坑" in c else c for c in new_cards])
+
+    return result
+
+
+def _worker_task_flat(
+    start_idx: int,
+    end_idx: int,
+    card_pool: List[str],
+    conditions: List[CompositeCondition],
+    draw_size: int,
+    name_to_fields: dict,
+    # 策略参数
+    golden_manhu_enabled: bool = False,
+    golden_manhu_draw_count: int = 2,
+    golden_qianhu_enabled: bool = False,
+    golden_qianhu_priority_fields: List[str] = ("手坑",),
+    golden_qianhu_draw_count: int = 6,
+    dark_draw_enabled: bool = False,
+    dark_draw_trigger_card: str = "暗抽卡",
+    dark_draw_required_field: str = "暗属性",
+    seed: int = None
+) -> List[Optional[int]]:
+    """
+    每个线程执行的抽卡模拟任务（不依赖 StrategyConfig）
+    """
+
+    if seed is not None:
+        random.seed(seed)
+
+    matched_indices = []
+
+    for draw_num in range(start_idx, end_idx + 1):
+        hand_names = random.sample(card_pool, draw_size)
+        hand_names = apply_strategies_flat(
+            hand_names,
+            card_pool,
+            golden_manhu_enabled=golden_manhu_enabled,
+            golden_manhu_draw_count=golden_manhu_draw_count,
+            golden_qianhu_enabled=golden_qianhu_enabled,
+            golden_qianhu_priority_fields=golden_qianhu_priority_fields,
+            golden_qianhu_draw_count=golden_qianhu_draw_count,
+            dark_draw_enabled=dark_draw_enabled,
+            dark_draw_trigger_card=dark_draw_trigger_card,
+            dark_draw_required_field=dark_draw_required_field
+        )
+
+        card_objects = [
+            Card(name=clean_card_name(n), fields=name_to_fields.get(clean_card_name(n), []))
+            for n in hand_names
+        ]
+
+        matched_index = None
+        for i, cond in enumerate(conditions):
+            if cond.is_satisfied(card_objects):
+                matched_index = i
+                break
+
+        matched_indices.append(matched_index)
+
+    logger.debug("线程完成 #%d - #%d 的抽卡模拟，共 %d 条结果",
+                 start_idx, end_idx, len(matched_indices))
+    return matched_indices
+
+
+
 
 # ================== 主流程函数 ==================
 
@@ -247,26 +372,27 @@ def simulate_draws(
     draw_size: int,
     num_draws: int,
     snapshot_interval: int,
-    strategy_config=None,
+    # 金满壶参数
+    golden_manhu_enabled: bool = False,
+    golden_manhu_draw_count: int = 2,
+    # 金谦壶参数
+    golden_qianhu_enabled: bool = False,
+    golden_qianhu_priority_fields: List[str] = ("手坑",),
+    golden_qianhu_draw_count: int = 6,
+    # 类暗抽参数
+    dark_draw_enabled: bool = False,
+    dark_draw_trigger_card: str = "暗之诱惑",
+    dark_draw_required_field: str = "暗属性",
+    # 日志回调
     callback: Optional[Callable[[str], None]] = None
 ) -> Tuple[float, str]:
     """
-    执行一次完整的模拟抽卡流程（包括策略应用 + 条件匹配 + 结果统计）
-    支持多线程加速和日志记录
+    扁平化参数版本的模拟抽卡主流程函数。
 
-    Args:
-        card_pool (List[str]): 卡池列表（字符串形式）
-        conditions (List[CompositeCondition]): 条件组列表
-        titles (List[str]): 每个条件组的标题
-        draw_size (int): 每次抽卡数量
-        num_draws (int): 总共执行多少次抽卡模拟
-        snapshot_interval (int): 每隔多少次输出一次抽卡快照
-        strategy_config (StrategyConfig): 策略配置对象
-        callback (Callable): 日志输出回调函数
-
-    Returns:
-        Tuple[float, str]: （成功概率，总结文本）
+    支持多线程加速 + 条件匹配 + 结果统计 + 快照日志 + 回调输出。
+    适用于 GUI/Web 前端直接调用，无需构造 StrategyConfig 对象。
     """
+
     logger.info("开始模拟抽卡任务，总次数：%d", num_draws)
 
     # 构建字段映射
@@ -291,14 +417,22 @@ def simulate_draws(
                 end_idx += extra  # 把余数加给第一个批次
 
             future = executor.submit(
-                _worker_task,
+                _worker_task_flat,
                 start_idx=start_idx,
                 end_idx=end_idx,
                 card_pool=card_pool,
                 conditions=conditions,
                 draw_size=draw_size,
                 name_to_fields=name_to_fields,
-                strategy_config=strategy_config,
+                # 策略参数
+                golden_manhu_enabled=golden_manhu_enabled,
+                golden_manhu_draw_count=golden_manhu_draw_count,
+                golden_qianhu_enabled=golden_qianhu_enabled,
+                golden_qianhu_priority_fields=golden_qianhu_priority_fields,
+                golden_qianhu_draw_count=golden_qianhu_draw_count,
+                dark_draw_enabled=dark_draw_enabled,
+                dark_draw_trigger_card=dark_draw_trigger_card,
+                dark_draw_required_field=dark_draw_required_field,
                 seed=random.randint(0, 2**32 - 1)
             )
             futures.append(future)
@@ -324,7 +458,18 @@ def simulate_draws(
     for draw_num in range(1, num_draws + 1):
         if draw_num % snapshot_interval == 0:
             hand_names = random.sample(card_pool, draw_size)
-            hand_names = apply_strategies(hand_names, card_pool, strategy_config)
+            hand_names = apply_strategies_flat(
+                hand_names,
+                card_pool,
+                golden_manhu_enabled=golden_manhu_enabled,
+                golden_manhu_draw_count=golden_manhu_draw_count,
+                golden_qianhu_enabled=golden_qianhu_enabled,
+                golden_qianhu_priority_fields=golden_qianhu_priority_fields,
+                golden_qianhu_draw_count=golden_qianhu_draw_count,
+                dark_draw_enabled=dark_draw_enabled,
+                dark_draw_trigger_card=dark_draw_trigger_card,
+                dark_draw_required_field=dark_draw_required_field
+            )
             matched_index = results[draw_num - 1]
             snapshot = _take_snapshot(draw_num, hand_names, matched_index, conditions)
             snapshots.append(snapshot)
