@@ -140,22 +140,25 @@ class MainFrame(QWidget):
         layout.addWidget(self.chk_jinqian)
         layout.addLayout(jinqian_layout)
 
-        # 暗抽策略
-        self.chk_dark_draw = QCheckBox("启用暗抽策略")
+        self.chk_dark_draw = QCheckBox("启用类暗抽策略")
+
+        dark_group = QGroupBox("暗抽配置")
         dark_layout = QHBoxLayout()
-        self.dark_draw_fields = QLineEdit()
-        self.dark_draw_fields.setPlaceholderText("字段名（英文逗号分隔）")
-        self.dark_draw_required_count = QSpinBox()
-        self.dark_draw_required_count.setRange(1, 5)
-        self.dark_draw_required_count.setValue(2)
-        dark_layout.addWidget(QLabel("字段:"))
-        dark_layout.addWidget(self.dark_draw_fields)
-        dark_layout.addWidget(QLabel("需要数量:"))
-        dark_layout.addWidget(self.dark_draw_required_count)
 
+        self.dark_draw_trigger_card = QLineEdit()
+        self.dark_draw_trigger_card.setPlaceholderText("如：暗抽卡")
+
+        self.dark_draw_required_field = QLineEdit()
+        self.dark_draw_required_field.setPlaceholderText("如：暗属性")
+
+        dark_layout.addWidget(QLabel("触发卡名:"))
+        dark_layout.addWidget(self.dark_draw_trigger_card)
+        dark_layout.addWidget(QLabel("所需字段:"))
+        dark_layout.addWidget(self.dark_draw_required_field)
+
+        dark_group.setLayout(dark_layout)
         layout.addWidget(self.chk_dark_draw)
-        layout.addLayout(dark_layout)
-
+        layout.addWidget(dark_group)
         group_box.setLayout(layout)
         return group_box
 
@@ -227,51 +230,48 @@ class MainFrame(QWidget):
 
     def run_simulation(self):
         self.btn_start_simulate.setEnabled(False)
+        self.log_output.clear()
+        self.log_output.append("[INFO] 开始模拟...")
 
-        # ✅ 收集策略参数，不创建 Strategy 实例
-        strategies_data = []
+        # 构造策略配置字典
+        strategy_dict = {
+            'golden_manhu_enabled': self.chk_jinman.isChecked(),
+            'golden_manhu_draw_count': self.spin_jinman_count.value(),
 
-        if self.chk_jinman.isChecked():
-            count = self.spin_jinman_count.value()
-            strategies_data.append({
-                'name': '金满壶',
-                'enabled': True,
-                'priority': 1,
-                'params': {'draw_count': count}
-            })
+            'golden_qianhu_enabled': self.chk_jinqian.isChecked(),
+            'golden_qianhu_priority_fields': [f.strip() for f in self.jinqian_fields.text().split(',') if f.strip()],
+            'golden_qianhu_draw_count': self.spin_jinqian_count.value(),
 
-        if self.chk_jinqian.isChecked():
-            count = self.spin_jinqian_count.value()
-            fields = [f.strip() for f in self.jinqian_fields.text().split(',') if f.strip()]
-            strategies_data.append({
-                'name': '金谦壶',
-                'enabled': True,
-                'priority': 2,
-                'params': {'select_count': count, 'field_priority': fields}
-            })
+            'dark_draw_enabled': self.chk_dark_draw.isChecked(),
+            'dark_draw_trigger_card': self.dark_draw_trigger_card.text().strip() or "暗抽卡",
+            'dark_draw_required_field': self.dark_draw_required_field.text().strip() or "暗属性"
+        }
 
-        if self.chk_dark_draw.isChecked():
-            fields = [f.strip() for f in self.dark_draw_fields.text().split(',') if f.strip()]
-            required = self.dark_draw_required_count.value()
-            strategies_data.append({
-                'name': '暗抽',
-                'enabled': True,
-                'priority': 3,
-                'params': {'fields': fields, 'required_count': required}
-            })
+        # 设置策略配置到控制器
+        self.controller.set_strategy_config([strategy_dict])  # 支持多组策略测试
 
-        self.thread = QThread()
+        # 创建 Worker 和线程
         self.worker = SimulationWorker(
             controller=self.controller,
             draw_size=self.draw_size_spin.value(),
             num_draws=self.num_draws_spin.value()
         )
+
+        self.thread = QThread()
         self.worker.moveToThread(self.thread)
 
-        # ✅ 设置策略到控制器（需要 controller 支持 set_strategies 方法）
-        self.controller.set_strategies(strategies_data)
+        # 连接信号
+        self.worker.log_signal.connect(lambda msg: self.log_output.append(msg))
+        self.worker.result_ready.connect(self.handle_result)
+        self.worker.finished.connect(self.on_simulation_finished)
 
-        ...
+        # 启动线程
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        self.thread.start()
 
     def handle_result(self, prob, report):
         self.log_output.append(f"\n[RESULT] 所有情况的总概率为: {prob:.2%}\n")

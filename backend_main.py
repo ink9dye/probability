@@ -32,7 +32,7 @@
 # backend_main.py
 
 from services.file_service import load_file
-from services.simulation_service import run_simulation
+from services.simulation_service import simulate_with_options
 
 
 def main():
@@ -47,7 +47,7 @@ def main():
     conditions, titles = load_file(condition_path, handler_type="condition", is_path=True)
 
     # 执行抽卡模拟并报告
-    run_simulation(
+    simulate_with_options(
         card_pool=card_pool,
         conditions=conditions,
         draw_size=5,
