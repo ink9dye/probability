@@ -37,7 +37,7 @@ class StrategyEditorFrame(QWidget):
 
     def load_strategies(self):
         """加载并展示策略"""
-        strategies = self.controller.get_all_strategies().values()
+        strategies = self.controller.get_all_strategies()
         self.clear_strategy_widgets()
 
         for strategy in sorted(strategies, key=lambda s: s.priority):

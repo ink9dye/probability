@@ -44,8 +44,7 @@ class MainWindow(QMainWindow):
         self.deck_editor_frame = DeckEditorFrame(controller=self.controller)
         self.notebook.addTab(self.deck_editor_frame, "卡组文件管理")
 
-        self.strategy_editor_frame = StrategyEditorFrame(controller=self.controller)  # ✅ 添加策略编辑器
-        self.notebook.addTab(self.strategy_editor_frame, "策略管理")  # ✅ 添加 Tab 页
+
 
         # 创建菜单栏
         self.create_menu_bar()
@@ -61,5 +60,5 @@ class MainWindow(QMainWindow):
         help_menu = menubar.addMenu("帮助")
         about_action = QAction("关于", self)
         about_action.triggered.connect(
-            lambda: QMessageBox.about(self, "关于", "游戏王卡组模拟器 v1.0\n© 2025 阿里云 YGO 团队"))
+            lambda: QMessageBox.about(self, "关于", "游戏王卡组模拟器 v1.0\n© 墨水"))
         help_menu.addAction(about_action)
