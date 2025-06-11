@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QInputDialog,QListWidget, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QObject, QThread
+from config.settings import DECK_DIR, CONDITION_DIR
 
 
 
@@ -13,11 +14,12 @@ class SimulationWorker(QObject):
     result_ready = Signal(float, str)
     finished = Signal()
 
-    def __init__(self, controller, draw_size, num_draws):
+    def __init__(self, controller, draw_size, num_draws, snapshot_interval):
         super().__init__()
         self.controller = controller
         self.draw_size = draw_size
         self.num_draws = num_draws
+        self.snapshot_interval = snapshot_interval
 
     def run(self):
         try:
@@ -27,6 +29,7 @@ class SimulationWorker(QObject):
             prob, report = self.controller.run_simulation(
                 draw_size=self.draw_size,
                 num_draws=self.num_draws,
+                snapshot_interval=self.snapshot_interval,  # 传递 snapshot_interval 参数
                 callback=callback
             )
             self.result_ready.emit(prob, report)
@@ -37,16 +40,25 @@ class SimulationWorker(QObject):
 
 
 class MainFrame(QWidget):
+    _settings_initialized = False
+    _default_draw_size = 5
+    _default_num_draws = 100000
+    _default_snapshot_interval = 20000
+
     def __init__(self, parent=None, controller=None):
         super().__init__(parent)
         self.controller = controller
 
-        self.deck_path = ""
-        self.condition_path = ""
+        # 只在第一次创建 MainFrame 时，初始化默认设置
+        if not MainFrame._settings_initialized:
+            MainFrame._settings_initialized = True
+        else:
+            # 之后创建的窗口不再修改默认值
+            MainFrame._default_num_draws = None
+            MainFrame._default_snapshot_interval = None
 
         self.init_ui()
         self.connect_signals()
-
     def init_ui(self):
         main_layout = QVBoxLayout()
         grid = QGridLayout()
@@ -148,7 +160,7 @@ class MainFrame(QWidget):
         dark_layout = QHBoxLayout()
 
         self.dark_draw_trigger_card = QLineEdit()
-        self.dark_draw_trigger_card.setPlaceholderText("如：暗抽卡")
+        self.dark_draw_trigger_card.setPlaceholderText("如：暗之诱惑")
 
         self.dark_draw_required_field = QLineEdit()
         self.dark_draw_required_field.setPlaceholderText("如：暗属性")
@@ -171,19 +183,21 @@ class MainFrame(QWidget):
 
         layout.addWidget(QLabel("抽卡张数"))
         self.draw_size_spin = QSpinBox()
-        self.draw_size_spin.setValue(5)
+        self.draw_size_spin.setValue(self._default_draw_size)
         layout.addWidget(self.draw_size_spin)
 
         layout.addWidget(QLabel("模拟次数"))
         self.num_draws_spin = QSpinBox()
         self.num_draws_spin.setRange(1000, 1000000)
-        self.num_draws_spin.setValue(100000)
+        if self._default_num_draws:
+            self.num_draws_spin.setValue(self._default_num_draws)
         layout.addWidget(self.num_draws_spin)
 
         layout.addWidget(QLabel("快照间隔"))
         self.snapshot_interval_spin = QSpinBox()
         self.snapshot_interval_spin.setRange(1000, 1000000)
-        self.snapshot_interval_spin.setValue(20000)
+        if self._default_snapshot_interval:
+            self.snapshot_interval_spin.setValue(self._default_snapshot_interval)
         layout.addWidget(self.snapshot_interval_spin)
 
         self.btn_start_simulate = QPushButton("开始模拟")
@@ -241,7 +255,7 @@ class MainFrame(QWidget):
             self.controller._show_error("导出失败", str(e))
 
     def load_txt_deck(self):
-        path, _ = QFileDialog.getOpenFileName(self, "选择卡组文件", "data/构筑", "文本文件 (*.txt)")
+        path, _ = QFileDialog.getOpenFileName(self, "选择卡组文件", DECK_DIR, "文本文件 (*.txt)")
         if path:
             self.deck_path = path
             self.deck_path_edit.setText(path)
@@ -249,7 +263,7 @@ class MainFrame(QWidget):
             self.log_output.append(f"[INFO] 加载构筑成功，共 {len(self.controller.card_pool)} 张卡牌\n")
 
     def load_conditions(self):
-        path, _ = QFileDialog.getOpenFileName(self, "选择条件文件", "data/条件", "文本文件 (*.txt)")
+        path, _ = QFileDialog.getOpenFileName(self, "选择条件文件", CONDITION_DIR, "文本文件 (*.txt)")
         if path:
             self.condition_path = path
             self.condition_path_edit.setText(path)
@@ -271,7 +285,7 @@ class MainFrame(QWidget):
             'golden_qianhu_draw_count': self.spin_jinqian_count.value(),
 
             'dark_draw_enabled': self.chk_dark_draw.isChecked(),
-            'dark_draw_trigger_card': self.dark_draw_trigger_card.text().strip() or "暗抽卡",
+            'dark_draw_trigger_card': self.dark_draw_trigger_card.text().strip() or "暗之诱惑",
             'dark_draw_required_field': self.dark_draw_required_field.text().strip() or "暗属性"
         }
 
@@ -282,7 +296,8 @@ class MainFrame(QWidget):
         self.worker = SimulationWorker(
             controller=self.controller,
             draw_size=self.draw_size_spin.value(),
-            num_draws=self.num_draws_spin.value()
+            num_draws=self.num_draws_spin.value(),
+            snapshot_interval=self.snapshot_interval_spin.value()  # 传递 snapshot_interval 参数
         )
 
         self.thread = QThread()

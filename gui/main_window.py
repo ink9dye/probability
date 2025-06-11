@@ -17,7 +17,7 @@ class MainWindow(QMainWindow):
         初始化主窗口，设置窗口标题和尺寸，创建控制器、Tab页面和菜单栏。
         """
         super().__init__()
-
+        ExceptionCatcher.install()
         # 设置窗口标题和初始尺寸
         self.setWindowTitle("游戏王卡组模拟器")
         self.setGeometry(300, 200, 1100, 750)
@@ -62,3 +62,30 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(
             lambda: QMessageBox.about(self, "关于", "游戏王卡组模拟器 v1.0\n© 墨水"))
         help_menu.addAction(about_action)
+
+
+
+
+
+import sys
+import traceback
+
+class ExceptionCatcher:
+    """
+    全局异常处理器，用于捕捉未处理的异常并输出堆栈信息。
+    """
+
+    @staticmethod
+    def install():
+        sys.excepthook = ExceptionCatcher.handle_exception
+
+    @staticmethod
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+
+        print("=== 捕获未处理异常 ===")
+        print("类型:", exc_type)
+        print("内容:", exc_value)
+        traceback.print_tb(exc_traceback)

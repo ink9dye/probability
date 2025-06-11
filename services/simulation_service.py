@@ -14,7 +14,7 @@ class StrategyConfig:
     golden_qianhu_priority_fields: List[str] = ("手坑",)
     golden_qianhu_draw_count: int = 6
     dark_draw_enabled: bool = False
-    dark_draw_trigger_card: str = "暗抽卡"
+    dark_draw_trigger_card: str = "暗之诱惑"
     dark_draw_required_field: str = "暗属性"
 
 
@@ -33,7 +33,7 @@ def simulate_with_options(
     golden_qianhu_priority_fields: List[str] = ("手坑",),
     golden_qianhu_draw_count: int = 6,
     dark_draw_enabled: bool = False,
-    dark_draw_trigger_card: str = "暗抽卡",
+    dark_draw_trigger_card: str = "暗之诱惑",
     dark_draw_required_field: str = "暗属性"
 ) -> Tuple[float, str]:
     """

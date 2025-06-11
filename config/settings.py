@@ -10,6 +10,6 @@ CSV_HEADERS = ["id", "name", "field"]
 
 
 DECK_DIR = os.path.join(PROJECT_ROOT, "data", "构筑")      # 存放卡组构筑
-CONDITION_DIR = os.path.join(PROJECT_ROOT, "data", "启动")  # 存放条件文件
+CONDITION_DIR = os.path.join(PROJECT_ROOT, "data", "条件")  # 存放条件文件
 
 STRATEGY_FILE = os.path.join(PROJECT_ROOT, "data", "strategies.json")
