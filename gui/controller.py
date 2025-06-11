@@ -6,12 +6,10 @@ from PySide6.QtWidgets import QInputDialog
 
 # ✅ 替换 parser_service 导入为 file_service
 from services.file_service import load_file, export_data, save_ydk
-from services.simulation_service import run_simulation as service_run_simulation
+from services.simulation_service import simulate_with_options, StrategyConfig
 from services.ydk_service import load_ydk_file, export_to_txt
 from services.local_db_service import get_local_db
-from services.strategy_service import get_local_strategy_db
 from typing import List, Union, Dict, Tuple, Set,Optional
-
 from config.settings import DECK_DIR, CONDITION_DIR
 
 
@@ -26,7 +24,6 @@ class AppController:
         self.condition_data = []       # 当前加载的模拟条件数据
         self.titles = []               # 条件对应的标题（列名）
         self.db = get_local_db()
-        self.strategy_db = get_local_strategy_db()
         # 本地数据库服务实例
 
     # ✅ 加载 YDK 文件或文本
@@ -145,32 +142,43 @@ class AppController:
             return []
 
     # ✅ 运行模拟器逻辑
-    def run_simulation(self, draw_size=5, num_draws=100000, snapshot_interval=20000, callback=None) -> Tuple[float, str]:
+    # gui/controller.py
+
+    def run_simulation(self, draw_size=5, num_draws=100000, snapshot_interval=20000, callback=None) -> Tuple[
+        float, str]:
         """
         执行模拟抽卡计算。
         :param draw_size: 每次抽卡数
         :param num_draws: 总模拟次数
-        :param snapshot_interval: 每隔多少次记录一次快照
-        :param callback: 进度回调函数（可选）
-        :return: Tuple(成功率, 模拟输出日志)
+        :param snapshot_interval: 快照间隔
+        :param callback: 回调函数（用于 GUI 显示）
+        :return: (成功率, 日志报告)
         """
         if not self.card_pool or not self.condition_data:
-            self._show_error("模拟失败", "缺少卡组或条件数据，无法模拟")
+            self._show_error("模拟失败", "缺少卡组或条件数据")
             return 0.0, ""
 
         try:
-            result = service_run_simulation(
+            # 获取当前策略配置（默认第一个）
+            strategy_config = self.strategy_configs[0] if hasattr(self,
+                                                                  'strategy_configs') and self.strategy_configs else None
+
+            # 调用新的模拟服务
+            probability, summary = simulate_with_options(
                 card_pool=self.card_pool,
                 conditions=self.condition_data,
+                titles=self.titles,
                 draw_size=draw_size,
                 num_draws=num_draws,
                 snapshot_interval=snapshot_interval,
-                titles=self.titles,
-                callback=callback
+                strategy_config=strategy_config,  # 新增：传入策略配置
+                callback=callback  # 保留回调
             )
-            return result
+
+            return probability, summary
+
         except Exception as e:
-            self._show_error("模拟失败", f"执行模拟时发生错误: {e}")
+            self._show_error(f"模拟失败: {e}")
             return 0.0, ""
 
     # 🗃️ —— 与卡牌数据库交互的方法 —— #
@@ -267,22 +275,25 @@ class AppController:
         except Exception as e:
             raise RuntimeError(f"保存失败: {e}")
 
+# 新增：设置策略配置的方法
+    def set_strategy_config(self, configs: list):
+        """
+        接收来自 GUI 的策略配置
+        :param configs: List[dict] 如：
+            [
+                {
+                    "golden_manhu_enabled": True,
+                    "golden_manhu_draw_count": 2,
+                    ...
+                },
+                ...
+            ]
+        """
+        from dataclasses import asdict
 
-# 🎯 策略相关方法
+        def dict_to_config(d):
+            return StrategyConfig(**d)
 
-    # 策略相关方法
+        self.strategy_configs = [dict_to_config(c) for c in configs]
 
-    def get_all_strategies(self):
-        return self.strategy_db.get_all_strategies()
 
-    def get_strategy(self, name: str):
-        return self.strategy_db.get_strategy(name)
-
-    def enable_strategy(self, name: str, enabled: bool = True):
-        return self.strategy_db.enable_strategy(name, enabled)
-
-    def set_strategy_priority(self, name: str, priority: int):
-        return self.strategy_db.set_priority(name, priority)
-
-    def apply_strategies(self, hand, pool):
-        return self.strategy_db.apply_all(hand, pool)

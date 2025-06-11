@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox, QPushButton,
     QLineEdit, QLabel, QSpinBox, QProgressBar, QTextEdit, QFileDialog,
-    QMessageBox, QListWidget, QCheckBox, QTextEdit
+    QMessageBox, QListWidget, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QObject, QThread
 from config.settings import CONDITION_DIR, DECK_DIR
@@ -112,28 +112,49 @@ class MainFrame(QWidget):
         group_box = QGroupBox("策略与规则设置")
         layout = QVBoxLayout()
 
-        self.chk_jinman = QCheckBox("金满表")
-        self.chk_priority = QCheckBox("优先级置")
-
-        self.chk_draw_times = QCheckBox("抽取次数")
-        self.spin_draw_times = QSpinBox()
-        self.spin_draw_times.setRange(1, 20)
-        self.spin_draw_times.setValue(6)
-
-        draw_layout = QHBoxLayout()
-        draw_layout.addWidget(self.chk_draw_times)
-        draw_layout.addWidget(self.spin_draw_times)
-
-        self.chk_blind = QCheckBox("踢名")
-        self.chk_self_activate = QCheckBox("自奏启动(主音≥1 & 自奏≥2)")
-        self.chk_tune = QCheckBox("帖抽(帖抽≥1 & 帖属性≥2)")
+        # 金满壶
+        self.chk_jinman = QCheckBox("启用金满壶策略")
+        jinman_layout = QHBoxLayout()
+        self.spin_jinman_count = QSpinBox()
+        self.spin_jinman_count.setRange(1, 3)
+        self.spin_jinman_count.setValue(2)
+        jinman_layout.addWidget(QLabel("抽取张数:"))
+        jinman_layout.addWidget(self.spin_jinman_count)
 
         layout.addWidget(self.chk_jinman)
-        layout.addWidget(self.chk_priority)
-        layout.addLayout(draw_layout)
-        layout.addWidget(self.chk_blind)
-        layout.addWidget(self.chk_self_activate)
-        layout.addWidget(self.chk_tune)
+        layout.addLayout(jinman_layout)
+
+        # 金谦壶
+        self.chk_jinqian = QCheckBox("启用金谦壶策略")
+        jinqian_layout = QHBoxLayout()
+        self.spin_jinqian_count = QSpinBox()
+        self.spin_jinqian_count.setRange(1, 6)
+        self.spin_jinqian_count.setValue(3)
+        self.jinqian_fields = QLineEdit()
+        self.jinqian_fields.setPlaceholderText("字段优先级（英文逗号分隔）")
+        jinqian_layout.addWidget(QLabel("选取张数:"))
+        jinqian_layout.addWidget(self.spin_jinqian_count)
+        jinqian_layout.addWidget(QLabel("字段优先级:"))
+        jinqian_layout.addWidget(self.jinqian_fields)
+
+        layout.addWidget(self.chk_jinqian)
+        layout.addLayout(jinqian_layout)
+
+        # 暗抽策略
+        self.chk_dark_draw = QCheckBox("启用暗抽策略")
+        dark_layout = QHBoxLayout()
+        self.dark_draw_fields = QLineEdit()
+        self.dark_draw_fields.setPlaceholderText("字段名（英文逗号分隔）")
+        self.dark_draw_required_count = QSpinBox()
+        self.dark_draw_required_count.setRange(1, 5)
+        self.dark_draw_required_count.setValue(2)
+        dark_layout.addWidget(QLabel("字段:"))
+        dark_layout.addWidget(self.dark_draw_fields)
+        dark_layout.addWidget(QLabel("需要数量:"))
+        dark_layout.addWidget(self.dark_draw_required_count)
+
+        layout.addWidget(self.chk_dark_draw)
+        layout.addLayout(dark_layout)
 
         group_box.setLayout(layout)
         return group_box
@@ -207,23 +228,50 @@ class MainFrame(QWidget):
     def run_simulation(self):
         self.btn_start_simulate.setEnabled(False)
 
+        # ✅ 收集策略参数，不创建 Strategy 实例
+        strategies_data = []
+
+        if self.chk_jinman.isChecked():
+            count = self.spin_jinman_count.value()
+            strategies_data.append({
+                'name': '金满壶',
+                'enabled': True,
+                'priority': 1,
+                'params': {'draw_count': count}
+            })
+
+        if self.chk_jinqian.isChecked():
+            count = self.spin_jinqian_count.value()
+            fields = [f.strip() for f in self.jinqian_fields.text().split(',') if f.strip()]
+            strategies_data.append({
+                'name': '金谦壶',
+                'enabled': True,
+                'priority': 2,
+                'params': {'select_count': count, 'field_priority': fields}
+            })
+
+        if self.chk_dark_draw.isChecked():
+            fields = [f.strip() for f in self.dark_draw_fields.text().split(',') if f.strip()]
+            required = self.dark_draw_required_count.value()
+            strategies_data.append({
+                'name': '暗抽',
+                'enabled': True,
+                'priority': 3,
+                'params': {'fields': fields, 'required_count': required}
+            })
+
         self.thread = QThread()
         self.worker = SimulationWorker(
-            self.controller,
+            controller=self.controller,
             draw_size=self.draw_size_spin.value(),
             num_draws=self.num_draws_spin.value()
         )
         self.worker.moveToThread(self.thread)
 
-        self.thread.started.connect(self.worker.run)
-        self.worker.log_signal.connect(self.log_output.append)
-        self.worker.result_ready.connect(self.handle_result)
-        self.worker.finished.connect(self.on_simulation_finished)
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
+        # ✅ 设置策略到控制器（需要 controller 支持 set_strategies 方法）
+        self.controller.set_strategies(strategies_data)
 
-        self.thread.start()
+        ...
 
     def handle_result(self, prob, report):
         self.log_output.append(f"\n[RESULT] 所有情况的总概率为: {prob:.2%}\n")

@@ -10,14 +10,12 @@ class Strategy:
         description: str,
         condition_func,
         action_func,
-        priority: int = 0,
         enabled: bool = True
     ):
         self.name = name
         self.description = description
         self.condition_func = condition_func
         self.action_func = action_func
-        self.priority = priority
         self.enabled = enabled
 
     def apply(self, hand: List[str], pool: List[str]) -> List[str]:
@@ -32,12 +30,13 @@ def apply_all_strategies(
     strategies: List[Strategy]
 ) -> List[str]:
     """
-    执行启用状态的策略，按优先级升序。
+    执行启用状态的策略，不再按优先级排序。
     """
-    active = sorted((s for s in strategies if s.enabled), key=lambda s: s.priority)
-    for strategy in active:
-        hand = strategy.apply(hand, pool)
+    for strategy in strategies:
+        if strategy.enabled:
+            hand = strategy.apply(hand, pool)
     return hand
+
 
 
 def get_builtin_strategies() -> List[Strategy]:
@@ -47,10 +46,9 @@ def get_builtin_strategies() -> List[Strategy]:
     return [
         Strategy(
             name="金满壶",
-            description="手牌中包含'金满壶'则抽2张卡",
+            description="手牌中包含'金满壶'则抽1或2张卡",
             condition_func=strategy_rules.golden_manhu_condition_factory("金满壶"),
             action_func=strategy_rules.golden_manhu_action_factory(2),
-            priority=1,
             enabled=True
         ),
         Strategy(
@@ -58,15 +56,13 @@ def get_builtin_strategies() -> List[Strategy]:
             description="手牌中包含'金谦壶'则按关键字抽取卡",
             condition_func=strategy_rules.golden_qianhu_condition_factory("金谦壶"),
             action_func=strategy_rules.golden_qianhu_action_factory(["手坑"], 6),
-            priority=2,
             enabled=True
         ),
         Strategy(
-            name="暗抽",
-            description="至少有2张'暗抽'或'暗'卡时抽2张",
+            name="类暗抽",
+            description="有特定字段卡时抽二",
             condition_func=strategy_rules.dark_draw_condition_factory(["暗抽", "暗"], 2),
             action_func=strategy_rules.dark_draw_action_factory(2),
-            priority=3,
             enabled=True
         )
     ]
