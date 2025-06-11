@@ -130,7 +130,7 @@ class AppController:
 
     # ──────────────────────────────── 模拟逻辑 ────────────────────────────────
 
-    def run_simulation(self, draw_size=5, num_draws=100000, snapshot_interval=20000, callback=None) -> Tuple[
+    def run_simulation(self, draw_size=5, num_draws=10000, snapshot_interval=2000, callback=None) -> Tuple[
         float, str]:
         print(f"✔ 传入的策略配置为: {asdict(self.strategy_configs[0]) if self.strategy_configs else '无'}")
 

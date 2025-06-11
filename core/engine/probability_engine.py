@@ -148,7 +148,8 @@ def apply_strategies(hand_names: List[str], pool: List[str], strategy_config=Non
         card_name = data.get("name")
         if card_name:
             name_to_fields[card_name] = data.get("field", [])
-    def get_fields(card_name: str):
+
+    def get_fields(card_name: str) -> List[str]:
         return [f.strip() for f in name_to_fields.get(card_name, [])]
 
     # 金满壶策略
@@ -265,7 +266,7 @@ def apply_strategies_flat(
         if any("强欲而金满之壶" in get_fields(c) for c in result):
             new_cards = draw_more(pool, result, golden_manhu_draw_count)
             result.extend([c.replace("手坑", "手后坑") if "手坑" in c else c for c in new_cards])
-            logger.info(f"【金满壶】触发成功，补抽: {new_cards}")
+            # logger.info(f"【金满壶】触发成功，补抽: {new_cards}")
 
     if golden_qianhu_enabled:
         if any("金满而谦虚之壶" in get_fields(c) for c in result):
@@ -282,18 +283,35 @@ def apply_strategies_flat(
                 chosen = new_cards[0].replace("手坑", "手后坑") if "手坑" in new_cards[0] else new_cards[0]
             if chosen:
                 result.append(chosen)
-                logger.info(f"【金谦壶】触发成功，选择: {chosen}")
+                # logger.info(f"【金谦壶】触发成功，选择: {chosen}")
 
-    if dark_draw_enabled:
-        logger.info("【类暗抽】开始,条件为: 触发卡名: %s, 所需字段: %s", dark_draw_trigger_card, dark_draw_required_field)
+    # if dark_draw_enabled:
+    #     logger.info("【类暗抽】开始检测，触发卡名: %s，所需字段: %s",
+    #                 dark_draw_trigger_card, dark_draw_required_field)
+
+        # 检查是否有触发卡牌
         trigger_cards = [c for c in result if dark_draw_trigger_card in get_fields(c)]
+        # if not trigger_cards:
+        #     logger.warning("【类暗抽】未找到任何触发卡牌: %s", dark_draw_trigger_card)
+        # else:
+        #     logger.info("【类暗抽】找到触发卡牌: %s", trigger_cards)
+
+        # 遍历所有触发卡牌并检查其字段是否符合要求
+        found_match = False
         for matched_card in trigger_cards:
             fields = get_fields(matched_card)
+            logger.debug("【类暗抽】卡牌 %s 的字段为: %s", matched_card, fields)
+
             if dark_draw_required_field in fields:
+                # logger.info("【类暗抽】卡牌 %s 匹配到所需字段 %s，准备补抽...", matched_card, dark_draw_required_field)
                 new_cards = draw_more(pool, result, 2)
                 result.extend([c.replace("手坑", "手后坑") if "手坑" in c else c for c in new_cards])
-                logger.info(f"【类暗抽】触发成功，补抽: {new_cards}")
+                # logger.info("【类暗抽】触发成功，补抽了 %d 张卡牌: %s", len(new_cards), new_cards)
+                found_match = True
                 break
+
+        # if not found_match:
+        #     logger.warning("【类暗抽】所有触发卡牌均未匹配到所需字段 %s", dark_draw_required_field)
 
     return result
 
@@ -330,21 +348,20 @@ def simulate_draws(
     """
 
     logger.info("开始模拟抽卡任务，总次数：%d", num_draws)
-    logger.info("开始模拟抽卡任务，总次数：%d", num_draws)
 
     # 新增参数调试日志
-    logger.debug("传入参数详情：")
-    logger.debug("  卡池大小: %d 张", len(card_pool))
-    logger.debug("  每次抽卡数量: %d 张", draw_size)
-    logger.debug("  条件组数量: %d 组", len(conditions))
-    logger.debug("  快照间隔: 每 %d 抽记录一次", snapshot_interval)
-    logger.debug("  金满壶启用: %s", golden_manhu_enabled)
-    logger.debug("  金谦壶启用: %s", golden_qianhu_enabled)
-    logger.debug("  类暗抽启用: %s", dark_draw_enabled)
+    logger.info("传入参数详情：")
+    logger.info("  卡池大小: %d 张", len(card_pool))
+    logger.info("  每次抽卡数量: %d 张", draw_size)
+    logger.info("  条件组数量: %d 组", len(conditions))
+    logger.info("  快照间隔: 每 %d 抽记录一次", snapshot_interval)
+    logger.info("  金满壶启用: %s", golden_manhu_enabled)
+    logger.info("  金谦壶启用: %s", golden_qianhu_enabled)
+    logger.info("  类暗抽启用: %s", dark_draw_enabled)
 
     # 构建字段映射表
     name_to_fields = _build_name_to_fields()
-    logger.debug("已加载 %d 张卡牌字段信息", len(name_to_fields))
+    logger.info("已加载 %d 张卡牌字段信息", len(name_to_fields))
 
     matched_indices = []
     snapshots = []

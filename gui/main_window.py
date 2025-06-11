@@ -8,6 +8,8 @@ from gui.frames.deck_editor_frame import DeckEditorFrame
 from gui.frames.strategy_editor_frame import StrategyEditorFrame
 
 
+from PySide6.QtCore import Slot
+
 class MainWindow(QMainWindow):
     """
     游戏王卡组模拟器的主窗口类，包含主界面和字段管理界面，并集成了菜单栏和控制器。
@@ -49,6 +51,10 @@ class MainWindow(QMainWindow):
         # 创建菜单栏
         self.create_menu_bar()
 
+
+    @Slot(str)
+    def append_log(self, msg):
+        self.main_frame.log_output.append(msg)
     def create_menu_bar(self):
         menubar = self.menuBar()
 
@@ -89,3 +95,5 @@ class ExceptionCatcher:
         print("类型:", exc_type)
         print("内容:", exc_value)
         traceback.print_tb(exc_traceback)
+        with open("error.log", "a", encoding="utf-8") as f:
+            traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)

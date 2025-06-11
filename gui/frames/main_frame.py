@@ -2,12 +2,11 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox, QPushButton,
     QLineEdit, QLabel, QSpinBox, QProgressBar, QTextEdit, QFileDialog,
-    QMessageBox, QInputDialog,QListWidget, QCheckBox
+    QMessageBox, QInputDialog, QListWidget, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QObject, QThread
 from config.settings import DECK_DIR, CONDITION_DIR
-
-
+from PySide6.QtCore import Slot
 
 class SimulationWorker(QObject):
     log_signal = Signal(str)
@@ -29,7 +28,7 @@ class SimulationWorker(QObject):
             prob, report = self.controller.run_simulation(
                 draw_size=self.draw_size,
                 num_draws=self.num_draws,
-                snapshot_interval=self.snapshot_interval,  # 传递 snapshot_interval 参数
+                snapshot_interval=self.snapshot_interval,
                 callback=callback
             )
             self.result_ready.emit(prob, report)
@@ -40,25 +39,12 @@ class SimulationWorker(QObject):
 
 
 class MainFrame(QWidget):
-    _settings_initialized = False
-    _default_draw_size = 5
-    _default_num_draws = 100000
-    _default_snapshot_interval = 20000
-
     def __init__(self, parent=None, controller=None):
         super().__init__(parent)
         self.controller = controller
-
-        # 只在第一次创建 MainFrame 时，初始化默认设置
-        if not MainFrame._settings_initialized:
-            MainFrame._settings_initialized = True
-        else:
-            # 之后创建的窗口不再修改默认值
-            MainFrame._default_num_draws = None
-            MainFrame._default_snapshot_interval = None
-
         self.init_ui()
         self.connect_signals()
+
     def init_ui(self):
         main_layout = QVBoxLayout()
         grid = QGridLayout()
@@ -183,21 +169,19 @@ class MainFrame(QWidget):
 
         layout.addWidget(QLabel("抽卡张数"))
         self.draw_size_spin = QSpinBox()
-        self.draw_size_spin.setValue(self._default_draw_size)
+        self.draw_size_spin.setValue(5)  # 固定默认值
         layout.addWidget(self.draw_size_spin)
 
         layout.addWidget(QLabel("模拟次数"))
         self.num_draws_spin = QSpinBox()
-        self.num_draws_spin.setRange(1000, 1000000)
-        if self._default_num_draws:
-            self.num_draws_spin.setValue(self._default_num_draws)
+        self.num_draws_spin.setRange(1, 10000)
+        self.num_draws_spin.setValue(10000)  # 固定默认值
         layout.addWidget(self.num_draws_spin)
 
         layout.addWidget(QLabel("快照间隔"))
         self.snapshot_interval_spin = QSpinBox()
-        self.snapshot_interval_spin.setRange(1000, 1000000)
-        if self._default_snapshot_interval:
-            self.snapshot_interval_spin.setValue(self._default_snapshot_interval)
+        self.snapshot_interval_spin.setRange(1, 10000)
+        self.snapshot_interval_spin.setValue(2000)  # ✅ 默认值保持不变
         layout.addWidget(self.snapshot_interval_spin)
 
         self.btn_start_simulate = QPushButton("开始模拟")
@@ -219,16 +203,12 @@ class MainFrame(QWidget):
             return
 
         try:
-            # 使用 file_utils 读取原始文本内容
             from utils.file_utils import read_from_file
             ydk_text = read_from_file(path)
-
-            # 设置到文本框中，保持原始格式
             self.ydk_input.setPlainText(ydk_text)
-            self.log_output.append(f"[INFO] 已加载 YDK 文件内容（原始文本）")
+            self.log_output.append("[INFO] 已加载 YDK 文件内容（原始文本）")
 
         except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "加载失败", f"无法读取 YDK 文件: {e}")
 
     def export_deck_txt(self):
@@ -238,17 +218,15 @@ class MainFrame(QWidget):
             return
 
         try:
-            # 让用户输入文件名（带默认值）
             default_name = "刻魔莫忘构筑"
             file_name, ok = QInputDialog.getText(
                 self, "导出 TXT 卡组", "请输入文件名（不含扩展名）：", text=default_name
             )
             if not ok or not file_name:
-                return  # 用户取消操作
+                return
 
             full_file_name = f"{file_name}.txt"
 
-            # ✅ 通过 controller 调用统一接口
             self.controller.export_current_deck_with_ydk(ydk_content=ydk_text, file_name=full_file_name)
 
         except Exception as e:
@@ -270,12 +248,15 @@ class MainFrame(QWidget):
             conditions = self.controller.load_condition_txt(source=path, is_path=True)
             self.log_output.append(f"[INFO] 加载了 {len(conditions)} 条启动条件\n")
 
+    @Slot(str)
+    def append_log(self, msg):
+        self.log_output.append(msg)
+
     def run_simulation(self):
         self.btn_start_simulate.setEnabled(False)
         self.log_output.clear()
         self.log_output.append("[INFO] 开始模拟...")
 
-        # 构造策略配置字典
         strategy_dict = {
             'golden_manhu_enabled': self.chk_jinman.isChecked(),
             'golden_manhu_draw_count': self.spin_jinman_count.value(),
@@ -289,26 +270,26 @@ class MainFrame(QWidget):
             'dark_draw_required_field': self.dark_draw_required_field.text().strip() or "暗属性"
         }
 
-        # 设置策略配置到控制器
-        self.controller.set_strategy_config([strategy_dict])  # 支持多组策略测试
+        self.controller.set_strategy_config([strategy_dict])
 
-        # 创建 Worker 和线程
         self.worker = SimulationWorker(
             controller=self.controller,
             draw_size=self.draw_size_spin.value(),
             num_draws=self.num_draws_spin.value(),
-            snapshot_interval=self.snapshot_interval_spin.value()  # 传递 snapshot_interval 参数
+            snapshot_interval=self.snapshot_interval_spin.value()
         )
 
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
 
-        # 连接信号
-        self.worker.log_signal.connect(lambda msg: self.log_output.append(msg))
+
+
+        # 替换之前的 connect
+        self.worker.log_signal.connect(self.append_log)
+
         self.worker.result_ready.connect(self.handle_result)
         self.worker.finished.connect(self.on_simulation_finished)
 
-        # 启动线程
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)

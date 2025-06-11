@@ -20,8 +20,8 @@
 #         card_pool=card_pool,
 #         conditions=conditions,
 #         draw_size=5,
-#         num_draws=100000,
-#         snapshot_interval=20000,
+#         num_draws=10000,
+#         snapshot_interval=2000,
 #         titles=titles
 #     )
 #

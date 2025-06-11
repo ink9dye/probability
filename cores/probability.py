@@ -3,9 +3,9 @@ from collections import Counter
 import secrets
 import time
 draw_size=5
-num_draws=100000
+num_draws=10000
 # 定义全局变量 N，用于每次输出累计概率的步长
-num_show=20000
+num_show=2000
 N =11  # 例如每次统计前11种情况的累计概率
 # 定义全局变量 pot_card_number，控制壶抽取的数量
 pot_card_number = 6
@@ -181,11 +181,11 @@ def simulate_draws(card_pool, conditions_list):
 
 def simulate_and_report(card_pool, conditions_list,title):
     """
-    进行抽卡模拟，记录每20000次的抽卡结果，并输出每个条件的满足概率。
+    进行抽卡模拟，记录每2000次的抽卡结果，并输出每个条件的满足概率。
     """
     probabilities, drawn_cards_snapshots = simulate_draws(card_pool, conditions_list)
 
-    # 输出每20000次抽卡的结果
+    # 输出每2000次抽卡的结果
     report_drawn_cards(drawn_cards_snapshots, conditions_list)
 
     # 输出每个条件的满足概率
@@ -194,7 +194,7 @@ def simulate_and_report(card_pool, conditions_list,title):
 
 def report_drawn_cards(drawn_cards_snapshots, conditions_list):
     """
-    输出每20000次抽卡的结果。
+    输出每2000次抽卡的结果。
     """
     for draw_num, cards, matched_condition in drawn_cards_snapshots:
         if matched_condition:
