@@ -8,11 +8,9 @@
 4. 结果统计与输出
 """
 
-import random
+import random,re
 import logging
-import os
 from typing import List, Tuple, Optional, Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from core.entity.card import Card
 from core.entity.composite_condition import CompositeCondition
 from services.local_db_service import LocalCardDB
@@ -21,10 +19,7 @@ from services.file_service import clean_card_name
 
 # ================== 配置 logging ==================
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s'
-)
+logging.basicConfig(level=logging.WARNING)  # 关闭所有 INFO 和 DEBUG 日志
 
 
 # ================== 辅助函数区 ==================
@@ -38,16 +33,21 @@ def _build_name_to_fields() -> dict:
     for cid, data in db.id_attr_map.items():
         card_name = data.get("name")
         if card_name:
-            name_to_fields[card_name] = data.get("field", [])
+            fields = data.get("field", [])
+            name_to_fields[card_name] = [f.strip() for f in fields]
     return name_to_fields
 
 
-def _convert_names_to_cards(names: List[str], field_map: dict) -> List[Card]:
+# 在模块加载时构建字段缓存
+NAME_TO_FIELDS = _build_name_to_fields()
+
+
+def _convert_names_to_cards(names: List[str]) -> List[Card]:
     """
     将卡名列表转换为 Card 对象列表
     """
     return [
-        Card(name=clean_card_name(n), fields=field_map.get(clean_card_name(n), []))
+        Card(name=clean_card_name(n), fields=NAME_TO_FIELDS.get(clean_card_name(n), []))
         for n in names
     ]
 
@@ -73,21 +73,13 @@ def _take_snapshot(draw_num: int, hand_names: List[str], matched_index: Optional
 
 def _log_snapshot(snapshot, conditions, callback: Optional[Callable[[str], None]]):
     """
-    调用回调函数记录日志信息
+    调用回调函数记录日志信息（保留接口以兼容UI）
     """
     draw_num, hand_names, matched_cond = snapshot
-
-    if matched_cond is not None:
-        try:
-            idx = conditions.index(matched_cond) + 1
-            line = f"第 {draw_num} 抽: {hand_names} ⇒ 满足条件 {idx}"
-        except ValueError:
-            line = f"第 {draw_num} 抽: {hand_names} ⇒ 满足条件（未知条件）"
-    else:
-        line = f"第 {draw_num} 抽: {hand_names} ⇒ 无匹配"
-
-    logger.info(line)
     if callback:
+        line = f"第 {draw_num} 抽: {hand_names} ⇒ " + (
+            f"满足条件 {conditions.index(matched_cond) + 1}" if matched_cond else "无匹配"
+        )
         callback(line)
 
 
@@ -133,60 +125,6 @@ def _generate_summary(matched_indices: List[Optional[int]], titles: List[str],
 
 # ================== 策略实现区 ==================
 
-def apply_strategies(hand_names: List[str], pool: List[str], strategy_config=None) -> List[str]:
-    """
-    根据配置对象应用所有启用的策略
-    """
-    result = hand_names.copy()
-    if strategy_config is None:
-        return result
-
-    # 构建字段映射表
-    db = LocalCardDB()
-    name_to_fields = {}
-    for cid, data in db.id_attr_map.items():
-        card_name = data.get("name")
-        if card_name:
-            name_to_fields[card_name] = data.get("field", [])
-
-    def get_fields(card_name: str) -> List[str]:
-        return [f.strip() for f in name_to_fields.get(card_name, [])]
-
-    # 金满壶策略
-    if strategy_config.golden_manhu_enabled:
-        if any("强欲而金满之壶" in get_fields(c) for c in result):
-            new_cards = draw_more(pool, result, strategy_config.golden_manhu_draw_count)
-            result.extend([c.replace("手坑", "手后坑") if "手坑" in c else c for c in new_cards])
-
-    # 金谦壶策略
-    if strategy_config.golden_qianhu_enabled:
-        if any("金满而谦虚之壶" in get_fields(c) for c in result):
-            new_cards = draw_more(pool, result, strategy_config.golden_qianhu_draw_count)
-            chosen = None
-            for p in strategy_config.golden_qianhu_priority_fields:
-                for c in new_cards:
-                    if p in get_fields(c):
-                        chosen = c.replace("手坑", "手后坑") if "手坑" in c else c
-                        break
-                if chosen:
-                    break
-            if not chosen and new_cards:
-                chosen = new_cards[0].replace("手坑", "手后坑") if "手坑" in new_cards[0] else "后置" + new_cards[0]
-            if chosen:
-                result.append(chosen)
-
-    # 类暗抽策略
-    if strategy_config.dark_draw_enabled:
-        has_trigger = any(strategy_config.dark_draw_trigger_card in get_fields(c) for c in result)
-        if has_trigger:
-            matched_card = next((c for c in result if any(strategy_config.dark_draw_trigger_card in get_fields(c))), None)
-            if matched_card and any(strategy_config.dark_draw_required_field in get_fields(matched_card)):
-                new_cards = draw_more(pool, result, 2)
-                result.extend([c.replace("手坑", "手后坑") if "手坑" in c else c for c in new_cards])
-
-    return result
-
-
 def draw_more(pool: List[str], exclude: List[str], count: int) -> List[str]:
     """
     从卡池中抽取未被排除的卡牌
@@ -194,48 +132,6 @@ def draw_more(pool: List[str], exclude: List[str], count: int) -> List[str]:
     remaining = [c for c in pool if c not in exclude]
     return random.sample(remaining, min(len(remaining), count))
 
-
-# ================== 并行化任务函数 ==================
-
-def _worker_task(
-    start_idx: int,
-    end_idx: int,
-    card_pool: List[str],
-    conditions: List[CompositeCondition],
-    draw_size: int,
-    name_to_fields: dict,
-    strategy_config=None,
-    seed: int = None
-) -> List[Optional[int]]:
-    """
-    每个线程执行的抽卡模拟任务
-    """
-
-    if seed is not None:
-        random.seed(seed)
-
-    matched_indices = []
-
-    for draw_num in range(start_idx, end_idx + 1):
-        hand_names = random.sample(card_pool, draw_size)
-        hand_names = apply_strategies(hand_names, card_pool, strategy_config)
-
-        card_objects = [
-            Card(name=clean_card_name(n), fields=name_to_fields.get(clean_card_name(n), []))
-            for n in hand_names
-        ]
-
-        matched_index = None
-        for i, cond in enumerate(conditions):
-            if cond.is_satisfied(card_objects):
-                matched_index = i
-                break
-
-        matched_indices.append(matched_index)
-
-    logger.info("线程完成 #%d - #%d 的抽卡模拟，共 %d 条结果",
-                 start_idx, end_idx, len(matched_indices))
-    return matched_indices
 
 def apply_strategies_flat(
     hand_names: List[str],
@@ -249,75 +145,83 @@ def apply_strategies_flat(
     dark_draw_trigger_card: str = "暗之诱惑",
     dark_draw_required_field: str = "暗属性"
 ) -> List[str]:
+    """
+    应用策略逻辑到当前手牌（扁平化版本，用于主流程）
+    """
     result = hand_names.copy()
-    db = LocalCardDB()
-    name_to_fields = {}
-    for cid, data in db.id_attr_map.items():
-        name = data.get("name")
-        if name:
-            name_to_fields[name] = data.get("field", [])
 
     def get_fields(cn: str):
-        return [f.strip() for f in name_to_fields.get(cn, [])]
+        return NAME_TO_FIELDS.get(cn, [])
 
-    # logger.info(f"【策略启用情况】金满壶: {golden_manhu_enabled}, 金谦壶: {golden_qianhu_enabled}, 类暗抽: {dark_draw_enabled}")
-
+    # 金满壶策略
     if golden_manhu_enabled:
         if any("强欲而金满之壶" in get_fields(c) for c in result):
             new_cards = draw_more(pool, result, golden_manhu_draw_count)
             result.extend([c.replace("手坑", "手后坑") if "手坑" in c else c for c in new_cards])
-            # logger.info(f"【金满壶】触发成功，补抽: {new_cards}")
 
-    if golden_qianhu_enabled:
-        if any("金满而谦虚之壶" in get_fields(c) for c in result):
+    # 金谦壶策略
+    # 金谦壶策略
+    if golden_qianhu_enabled and golden_qianhu_priority_fields:
+        has_trigger = any("金满而谦虚之壶" in get_fields(c) for c in result)
+        if has_trigger:
             new_cards = draw_more(pool, result, golden_qianhu_draw_count)
+
             chosen = None
-            for p in golden_qianhu_priority_fields:
+
+            # 构建所有字段集合（支持子串、中英文逗号）
+            current_all_fields = [
+                field.strip()
+                for name in result
+                for f in NAME_TO_FIELDS.get(name, [])
+                for field in re.split(r"[、,\s]+", f)
+            ]
+
+            # 逐级查找字段
+            matched_index = -1
+            for i, p in enumerate(golden_qianhu_priority_fields):
+                if any(p in field for field in current_all_fields):
+                    continue  # 当前字段已存在，继续往下找
+                else:
+                    # 找到第一个未匹配字段
+                    matched_index = i
+                    break
+
+            # 即使所有字段都匹配，也继续执行补抽逻辑，但是会变成选第一张
+            # 从 matched_index 开始查找补抽卡
+            search_order = golden_qianhu_priority_fields[matched_index:]
+
+            # 在补抽卡中查找第一个匹配字段
+            for p in search_order:
                 for c in new_cards:
-                    if p in get_fields(c):
+                    card_fields = [
+                        field.strip()
+                        for f in NAME_TO_FIELDS.get(c, [])
+                        for field in re.split(r"[、,\s]+", f)
+                    ]
+                    if any(p in field for field in card_fields):
                         chosen = c.replace("手坑", "手后坑") if "手坑" in c else c
                         break
                 if chosen:
                     break
+
+            # 如果没找到任何字段匹配的卡，就选第一张
             if not chosen and new_cards:
                 chosen = new_cards[0].replace("手坑", "手后坑") if "手坑" in new_cards[0] else new_cards[0]
+
             if chosen:
                 result.append(chosen)
-                # logger.info(f"【金谦壶】触发成功，选择: {chosen}")
-
-    # if dark_draw_enabled:
-    #     logger.info("【类暗抽】开始检测，触发卡名: %s，所需字段: %s",
-    #                 dark_draw_trigger_card, dark_draw_required_field)
-
-        # 检查是否有触发卡牌
+    # 类暗抽策略
+    if dark_draw_enabled:
         trigger_cards = [c for c in result if dark_draw_trigger_card in get_fields(c)]
-        # if not trigger_cards:
-        #     logger.warning("【类暗抽】未找到任何触发卡牌: %s", dark_draw_trigger_card)
-        # else:
-        #     logger.info("【类暗抽】找到触发卡牌: %s", trigger_cards)
-
-        # 遍历所有触发卡牌并检查其字段是否符合要求
         found_match = False
         for matched_card in trigger_cards:
-            fields = get_fields(matched_card)
-            logger.debug("【类暗抽】卡牌 %s 的字段为: %s", matched_card, fields)
-
-            if dark_draw_required_field in fields:
-                # logger.info("【类暗抽】卡牌 %s 匹配到所需字段 %s，准备补抽...", matched_card, dark_draw_required_field)
+            if dark_draw_required_field in get_fields(matched_card):
                 new_cards = draw_more(pool, result, 2)
                 result.extend([c.replace("手坑", "手后坑") if "手坑" in c else c for c in new_cards])
-                # logger.info("【类暗抽】触发成功，补抽了 %d 张卡牌: %s", len(new_cards), new_cards)
                 found_match = True
                 break
 
-        # if not found_match:
-        #     logger.warning("【类暗抽】所有触发卡牌均未匹配到所需字段 %s", dark_draw_required_field)
-
     return result
-
-
-
-
 
 
 # ================== 主流程函数 ==================
@@ -347,22 +251,6 @@ def simulate_draws(
     单线程版本的模拟抽卡主流程函数，适用于桌面打包应用。
     """
 
-    logger.info("开始模拟抽卡任务，总次数：%d", num_draws)
-
-    # 新增参数调试日志
-    logger.info("传入参数详情：")
-    logger.info("  卡池大小: %d 张", len(card_pool))
-    logger.info("  每次抽卡数量: %d 张", draw_size)
-    logger.info("  条件组数量: %d 组", len(conditions))
-    logger.info("  快照间隔: 每 %d 抽记录一次", snapshot_interval)
-    logger.info("  金满壶启用: %s", golden_manhu_enabled)
-    logger.info("  金谦壶启用: %s", golden_qianhu_enabled)
-    logger.info("  类暗抽启用: %s", dark_draw_enabled)
-
-    # 构建字段映射表
-    name_to_fields = _build_name_to_fields()
-    logger.info("已加载 %d 张卡牌字段信息", len(name_to_fields))
-
     matched_indices = []
     snapshots = []
 
@@ -383,7 +271,7 @@ def simulate_draws(
         )
 
         card_objects = [
-            Card(name=clean_card_name(n), fields=name_to_fields.get(clean_card_name(n), []))
+            Card(name=clean_card_name(n), fields=NAME_TO_FIELDS.get(clean_card_name(n), []))
             for n in hand_names
         ]
 
@@ -395,14 +283,12 @@ def simulate_draws(
             snapshot = _take_snapshot(draw_num, hand_names, matched_index, conditions)
             snapshots.append(snapshot)
 
-    # 输出快照日志
+    # 回调写入日志（保留接口）
     for snapshot in snapshots:
         _log_snapshot(snapshot, conditions, callback)
 
     # 总结
     probability = _calculate_probability(matched_indices, num_draws)
     summary_text = _generate_summary(matched_indices, titles, conditions)
-
-    logger.info("模拟完成，成功率 %.2f%%", probability * 100)
 
     return probability, summary_text

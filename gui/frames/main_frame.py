@@ -174,14 +174,14 @@ class MainFrame(QWidget):
 
         layout.addWidget(QLabel("模拟次数"))
         self.num_draws_spin = QSpinBox()
-        self.num_draws_spin.setRange(1, 10000)
+        self.num_draws_spin.setRange(1, 100000000)
         self.num_draws_spin.setValue(10000)  # 固定默认值
         layout.addWidget(self.num_draws_spin)
 
         layout.addWidget(QLabel("快照间隔"))
         self.snapshot_interval_spin = QSpinBox()
-        self.snapshot_interval_spin.setRange(1, 10000)
-        self.snapshot_interval_spin.setValue(2000)  # ✅ 默认值保持不变
+        self.snapshot_interval_spin.setRange(1, 100000000)
+        self.snapshot_interval_spin.setValue(2000)  # 固定默认值
         layout.addWidget(self.snapshot_interval_spin)
 
         self.btn_start_simulate = QPushButton("开始模拟")
