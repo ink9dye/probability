@@ -129,8 +129,7 @@ class MainFrame(QWidget):
         self.spin_jinqian_count = QSpinBox()
         self.spin_jinqian_count.setRange(1, 6)
         self.spin_jinqian_count.setValue(3)
-        self.jinqian_fields = QLineEdit()
-        self.jinqian_fields.setPlaceholderText("字段优先级（英文逗号分隔）")
+        self.jinqian_fields = QLineEdit("天魔女，海马，骨派对，手坑")
         jinqian_layout.addWidget(QLabel("选取张数:"))
         jinqian_layout.addWidget(self.spin_jinqian_count)
         jinqian_layout.addWidget(QLabel("字段优先级:"))
@@ -145,11 +144,14 @@ class MainFrame(QWidget):
         dark_group = QGroupBox("暗抽配置")
         dark_layout = QHBoxLayout()
 
-        self.dark_draw_trigger_card = QLineEdit()
-        self.dark_draw_trigger_card.setPlaceholderText("如：暗之诱惑")
+        self.dark_draw_trigger_card = QLineEdit("暗之诱惑")  # 设置默认值
+        self.dark_draw_trigger_card.setReadOnly(True)  # 禁止编辑（可选）
+        self.dark_draw_trigger_card.setStyleSheet("background-color: #f0f0f0;")  # 灰色背景（可选）
 
-        self.dark_draw_required_field = QLineEdit()
-        self.dark_draw_required_field.setPlaceholderText("如：暗属性")
+        self.dark_draw_required_field = QLineEdit("暗属性")  # 设置默认值
+        self.dark_draw_required_field.setReadOnly(True)  # 禁止编辑（可选）
+        self.dark_draw_trigger_card.setStyleSheet("background-color: #f0f0f0;")  # 灰色背景（可选）
+
 
         dark_layout.addWidget(QLabel("触发卡名:"))
         dark_layout.addWidget(self.dark_draw_trigger_card)
