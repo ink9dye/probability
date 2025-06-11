@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QFrame, QWidget, QVBoxLayout, QHBoxLayout, QLineEd
 from PySide6.QtCore import Qt
 from gui.widgets.raw_text_editor import RawTextEditor
 from config.settings import CONDITION_DIR
+from utils.file_utils import read_from_file, write_to_file
 
 
 class ConditionEditorFrame(QFrame):
@@ -61,12 +62,12 @@ class ConditionEditorFrame(QFrame):
             return
 
         try:
-            # with open(path, 'r', encoding='utf-8') as f:
-            #     content = f.read()
-                content = "\n".join(self.controller.load_deck_txt(path))
-                self.editor.setPlainText(content)
-                self.file_entry.setText(path)
-                self.current_file = path
+            # ✅ 使用 file_utils 读取文件内容
+            content = read_from_file(path)
+            self.editor.setPlainText(content)
+            self.file_entry.setText(path)
+            self.current_file = path
+
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "加载失败", str(e))
