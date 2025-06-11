@@ -72,6 +72,56 @@ class AppController:
         except Exception as e:
             self._show_error("导出失败", f"{e}")
 
+    def export_current_deck_with_ydk(self, ydk_content: str, file_name: str = None):
+        """
+        接收 YDK 文本内容，解析并导出为 TXT 卡组文件。
+        :param ydk_content: YDK 文件的文本内容（非路径）
+        :param file_name: 输出文件名（可选）
+        """
+        try:
+            # 1️⃣ 解析 YDK 内容为 main_ids, extra_ids, side_ids
+            from services.ydk_service import load_ydk_file  # 修改为 load_ydk_file
+            ydk_data = load_ydk_file(source=ydk_content, is_path=False)
+            main_ids = ydk_data.get("main", [])
+            extra_ids = ydk_data.get("extra", [])
+            side_ids = ydk_data.get("side", [])
+
+            all_ids = main_ids + extra_ids + side_ids
+
+            # 2️⃣ 补全缺失卡牌信息
+            from services.ydk_service import batch_fetch_missing
+            batch_fetch_missing(all_ids)
+
+            # 3️⃣ 导出构筑文件
+            from services.ydk_service import export_to_txt
+            export_to_txt(main_ids, extra_ids, side_ids, output_file=file_name)
+
+        except Exception as e:
+            self._show_error("导出失败", f"导出 YDK 内容时发生错误: {e}")
+
+    def export_current_deck_with_data(self, card_names: list):
+        """
+        使用指定的卡名列表导出 TXT 文件。
+        """
+        if not card_names:
+            self._show_error("导出失败", "当前卡组为空")
+            return
+
+        file_name, ok = QInputDialog.getText(
+            self.main_window,
+            "导出卡组",
+            "请输入文件名（不含扩展名）："
+        )
+        if not ok or not file_name:
+            return
+        file_name += ".txt"
+
+        try:
+            export_data(data=card_names, file_name=file_name, data_type='deck')
+            self._show_info("成功", f"卡组已导出至 data/构筑/{file_name}")
+        except Exception as e:
+            self._show_error("导出失败", f"{e}")
+
     def export_condition_data(self, filename: str = "default_conditions.txt", *subdirs) -> None:
         """
         导出当前条件数据到指定路径下的 TXT 文件。

@@ -2,9 +2,10 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox, QPushButton,
     QLineEdit, QLabel, QSpinBox, QProgressBar, QTextEdit, QFileDialog,
-    QMessageBox, QListWidget, QCheckBox
+    QMessageBox, QInputDialog,QListWidget, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QObject, QThread
+
 
 
 class SimulationWorker(QObject):
@@ -200,19 +201,44 @@ class MainFrame(QWidget):
 
     def load_ydk_file(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择 YDK 文件", "", "YDK 文件 (*.ydk)")
-        if path:
-            card_names = self.controller.load_ydk(path)
-            self.ydk_input.setPlainText(path)
-            self.log_output.append(f"[INFO] 加载了 {len(card_names)} 张卡牌（卡组码）\n")
+        if not path:
+            return
+
+        try:
+            # 使用 file_utils 读取原始文本内容
+            from utils.file_utils import read_from_file
+            ydk_text = read_from_file(path)
+
+            # 设置到文本框中，保持原始格式
+            self.ydk_input.setPlainText(ydk_text)
+            self.log_output.append(f"[INFO] 已加载 YDK 文件内容（原始文本）")
+
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "加载失败", f"无法读取 YDK 文件: {e}")
 
     def export_deck_txt(self):
         ydk_text = self.ydk_input.toPlainText().strip()
-        if ydk_text:
-            card_names = self.controller.load_ydk(ydk_text, is_path=False)
-            if not card_names:
-                raise ValueError("YDK 内容为空或解析失败")
+        if not ydk_text:
+            self.controller._show_error("导出失败", "文本框为空")
+            return
 
-        self.controller.export_current_deck()
+        try:
+            # 让用户输入文件名（带默认值）
+            default_name = "刻魔莫忘构筑"
+            file_name, ok = QInputDialog.getText(
+                self, "导出 TXT 卡组", "请输入文件名（不含扩展名）：", text=default_name
+            )
+            if not ok or not file_name:
+                return  # 用户取消操作
+
+            full_file_name = f"{file_name}.txt"
+
+            # ✅ 通过 controller 调用统一接口
+            self.controller.export_current_deck_with_ydk(ydk_content=ydk_text, file_name=full_file_name)
+
+        except Exception as e:
+            self.controller._show_error("导出失败", str(e))
 
     def load_txt_deck(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择卡组文件", "data/构筑", "文本文件 (*.txt)")
