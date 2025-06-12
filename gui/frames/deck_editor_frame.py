@@ -3,7 +3,7 @@
 from PySide6.QtWidgets import QFrame, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton
 from PySide6.QtCore import Qt
 from gui.widgets.raw_text_editor import RawTextEditor
-from config.settings import DECK_DIR  # ✅ 引入 settings 中定义的路径常量
+from config.settings import DECK_DIR  # 引入 settings 中定义的路径常量
 
 
 class DeckEditorFrame(QFrame):
@@ -16,7 +16,7 @@ class DeckEditorFrame(QFrame):
         super().__init__(parent)
         self.controller = controller
         self.current_file = None
-        self.default_dir = DECK_DIR  # ✅ 使用 settings 中定义的路径
+        self.default_dir = DECK_DIR  # 使用 settings 中定义的路径
         self.init_ui()
 
     def init_ui(self):
@@ -56,7 +56,7 @@ class DeckEditorFrame(QFrame):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "选择卡组文件",
-            self.default_dir,  # ✅ 使用 settings 中定义的默认路径
+            self.default_dir,  # 使用 settings 中定义的默认路径
             "TXT 文件 (*.txt)"
         )
         if not path:
@@ -79,7 +79,7 @@ class DeckEditorFrame(QFrame):
             self.current_file, _ = QFileDialog.getSaveFileName(
                 self,
                 "保存文件",
-                self.default_dir,  # ✅ 使用 settings 中定义的默认路径
+                self.default_dir,  # 使用 settings 中定义的默认路径
                 "TXT 文件 (*.txt)"
             )
             if not self.current_file:

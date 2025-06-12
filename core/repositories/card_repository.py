@@ -85,7 +85,7 @@ class LocalCardDB:
             name = card.get("name", "")
             fields = card.get("field", "").split("、") if isinstance(card.get("field"), str) else card.get("field", [])
             self.add_card(cid=cid, name=name, fields=fields)
-        print(f"✅ 已新增 {len(cards)} 张卡牌")
+        print(f"已新增 {len(cards)} 张卡牌")
 
     def delete_card(self, cid: str) -> bool:
         """
@@ -285,7 +285,7 @@ class LocalCardDB:
                     val = "、".join(val)
                 new_row[key] = val
 
-            data_map[cid] = new_row  # ✅ 无论是否存在，直接插入或覆盖
+            data_map[cid] = new_row  # 无论是否存在，直接插入或覆盖
 
         sorted_data = sorted(data_map.values(), key=lambda x: int(x['id']))
 
@@ -294,4 +294,4 @@ class LocalCardDB:
             writer.writeheader()
             writer.writerows(sorted_data)
 
-        print(f"✅ 已写入 {len(updated_cids)} 张卡牌（支持新增）")
+        print(f"已写入 {len(updated_cids)} 张卡牌（支持新增）")

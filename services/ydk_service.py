@@ -108,7 +108,7 @@ def ensure_hand_traps_loaded():
         for cid in all_hand_trap_ids:
             db.add_card_attribute(cid, "field", "手坑")
 
-        print("✅ 手坑卡组已确保加载，并已添加“手坑”字段")
+        print("手坑卡组已确保加载，并已添加“手坑”字段")
     except Exception as e:
         print(f"[ERROR] 手坑卡组加载失败: {e}")
 
@@ -187,7 +187,7 @@ def load_ydk_file(source: Union[str, os.PathLike], is_path: bool = True, field_t
 
 def export_to_txt(main_ids: List[str], extra_ids: List[str], side_ids: List[str], output_file: str = None):
     ensure_hand_traps_loaded()
-    combined_ids = main_ids  # ✅ 仅导出主卡组
+    combined_ids = main_ids  # 仅导出主卡组
     batch_fetch_missing(combined_ids)
 
     name_counter = defaultdict(int)
@@ -203,7 +203,7 @@ def export_to_txt(main_ids: List[str], extra_ids: List[str], side_ids: List[str]
     else:
         result_path = write_to_file(lines, "征服斗魂构筑.txt", "data", "构筑")
 
-    print(f"✅ 构筑文件已保存至：{result_path}")
+    print(f"构筑文件已保存至：{result_path}")
     print(f"[ydk_service] 数据库缓存大小: {len(db.id_attr_map)}")
 
 

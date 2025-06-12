@@ -62,7 +62,7 @@ class ConditionEditorFrame(QFrame):
             return
 
         try:
-            # ✅ 使用 file_utils 读取文件内容
+            # 使用 file_utils 读取文件内容
             content = read_from_file(path)
             self.editor.setPlainText(content)
             self.file_entry.setText(path)

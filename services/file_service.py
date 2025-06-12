@@ -28,7 +28,7 @@ def save_file(file_path: str, handler_type: str, data, titles: list[str] = None)
     return handler_save(file_path, handler_type, data, titles=titles)
 
 
-# ✅ 便捷封装：用于 deck / condition / ydk 的快捷方法
+# 便捷封装：用于 deck / condition / ydk 的快捷方法
 
 def load_deck(source: str, is_ydk: bool = False, is_path: bool = True):
     return load_file(source, "ydk" if is_ydk else "deck", is_path=is_path)
@@ -98,7 +98,7 @@ def export_data(file_path: str, data_type: str, data: List[List[Any]], titles: O
                 f.write(','.join(titles) + '\n')
             for row in data:
                 f.write(','.join(map(str, row)) + '\n')
-        print(f"✅ 已导出至: {full_file_path}")
+        print(f"已导出至: {full_file_path}")
         return full_file_path
     except Exception as e:
         raise RuntimeError(f"导出失败: {e}")
