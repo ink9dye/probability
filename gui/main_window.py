@@ -5,7 +5,7 @@ from gui.frames.main_frame import MainFrame
 from gui.frames.card_editor_frame import CardEditorFrame
 from gui.frames.condition_editor_frame import ConditionEditorFrame
 from gui.frames.deck_editor_frame import DeckEditorFrame
-from gui.frames.strategy_editor_frame import StrategyEditorFrame
+# from gui.frames.strategy_editor_frame import StrategyEditorFrame
 
 
 from PySide6.QtCore import Slot
