@@ -8,7 +8,7 @@ def main():
     """
     # 定义文件路径
     first_document_path = "构筑与启动/祈夏sf杀音构筑改版紧急喷气.txt"
-    second_document_path = "构筑与启动/t0杀音启动.txt"
+    second_document_path = "构筑与启动/杀音启动.txt"
 
     # 读取文件内容
     #卡组
