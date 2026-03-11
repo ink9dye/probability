@@ -3,49 +3,39 @@ from collections import Counter
 from main import N
 
 draw_size = 5
-num_draws = 200000     # 推荐值，误差 ~0.1% 级别
-
+num_draws = 200000     # 经验上误差约在 0.1% 左右
 num_show = 10000
 pot_card_number = 6
 
 _rng = random.Random()
 
 
-ALL_KEYWORDS = [
-    "金满壶",
-    "金谦壶",
-    "强贪",
-    "动",
-    "补",
-    "本家",
-    "手坑",
-    "手后坑",
-    "补骨趴",
-    "主音",
-    "自奏",
-    "暗抽",
-    "暗",
-    "见神",
-    "速攻",
-]
+def draw_cards(card_pool, draw_count):
+    """
+    从卡池中随机抽取指定数量的卡片。
+    使用模块级随机数生成器，避免每次创建/seed 新实例带来的额外开销。
+    """
+    if len(card_pool) < draw_count:
+        raise ValueError("卡池中的卡片数量不足以抽取指定数量的卡片")
+
+    return _rng.sample(card_pool, draw_count)
 
 
-def init_keyword_counts():
-    return {k: 0 for k in ALL_KEYWORDS}
-
-
-def add_card_to_keyword_counts(card, keyword_counts):
-    for kw in ALL_KEYWORDS:
-        if kw in card:
-            keyword_counts[kw] += 1
-
-
-def add_cards_to_keyword_counts(cards, keyword_counts):
-    for c in cards:
-        add_card_to_keyword_counts(c, keyword_counts)
+def get_remaining_cards(card_pool, drawn_cards):
+    """
+    按“旧逻辑”实现的剩余卡：
+    旧写法是 [card for card in card_pool if card not in drawn_cards]，
+    即：只要某张牌名在手牌中出现过，就把卡组里所有同名的牌都去掉。
+    这里用 set 加速 membership，语义保持不变。
+    """
+    drawn_set = set(drawn_cards)
+    return [card for card in card_pool if card not in drawn_set]
 
 
 def check_conditions(drawn_cards, conditions):
+    """
+    检查抽取的卡片是否符合给定条件集合。
+    """
     card_counts = Counter()
 
     for card in drawn_cards:
@@ -55,7 +45,6 @@ def check_conditions(drawn_cards, conditions):
 
     for card_name, operator, value in conditions:
         card_count = card_counts.get(card_name, 0)
-
         if operator == "大于等于" and card_count < value:
             return False
         elif operator == "大于" and card_count <= value:
@@ -70,141 +59,135 @@ def check_conditions(drawn_cards, conditions):
     return True
 
 
-def simulate_single_game(card_pool, conditions_list):
+def handle_pot(drawn_cards, card_pool):
     """
-    单局模拟：使用“洗牌 + 指针”的方式在同一副牌堆上不放回抽牌，
-    逻辑保持与原先 handle_pot / zizou / anchou / jianshen 完全一致。
+    处理抽到的壶，决定加入手卡的逻辑。
+    逻辑与旧代码保持一致，仅在实现上做了性能优化。
     """
-    # 1. 复制并洗牌
-    deck = card_pool[:]
-    _rng.shuffle(deck)
-    pos = 0
+    # 如果手牌中有“金满壶”
+    if any("金满壶" in card for card in drawn_cards):
+        remaining_cards = get_remaining_cards(card_pool, drawn_cards)
+        new_cards = draw_cards(remaining_cards, 2)
 
-    # 2. 初始化关键字计数
-    keyword_counts = init_keyword_counts()
+        # 修改 new_cards 中包含 "手坑" 的元素
+        new_cards = [
+            card.replace("手坑", "手后坑") if "手坑" in card else card
+            for card in new_cards
+        ]
 
-    # 3. 首抽
-    drawn_cards = deck[pos:pos + draw_size]
-    pos += draw_size
-    add_cards_to_keyword_counts(drawn_cards, keyword_counts)
+        drawn_cards.extend(new_cards)
+        return drawn_cards
 
-    # 4. 壶相关效果（按照原代码的优先级：金满壶 > 金谦壶 > 强贪）
-    has_jinman = keyword_counts.get("金满壶", 0) > 0
-    has_jinqian = keyword_counts.get("金谦壶", 0) > 0
-    has_qiangtan = keyword_counts.get("强贪", 0) > 0
+    # 如果手牌中有“金谦壶”
+    if any("金谦壶" in card for card in drawn_cards):
+        remaining_cards = get_remaining_cards(card_pool, drawn_cards)
+        new_cards = draw_cards(remaining_cards, pot_card_number)
 
-    if has_jinman:
-        # 金满壶：从剩余牌堆顶再摸 2 张，手坑 -> 手后坑
-        new_cards = deck[pos:pos + 2]
-        pos += 2
+        has_blob = any("一滴" in card for card in new_cards)
+        has_moving = any("动" in card for card in drawn_cards)
+        has_recoup = any("补" in card for card in drawn_cards)
+        has_trap = any("手坑" in card for card in drawn_cards)
+        has_bugu_pa = any("补骨趴" in card for card in drawn_cards)
+        has_self = any("本家" in card for card in drawn_cards)
 
-        processed = []
-        for c in new_cards:
-            if "手坑" in c:
-                nc = c.replace("手坑", "手后坑")
-            else:
-                nc = c
-            processed.append(nc)
-            add_card_to_keyword_counts(nc, keyword_counts)
-
-        drawn_cards.extend(processed)
-
-    elif has_jinqian:
-        # 金谦壶：从剩余牌堆顶看 pot_card_number 张，根据原逻辑优先级挑 1 张
-        new_cards = deck[pos:pos + pot_card_number]
-        pos += pot_card_number
-
-        has_moving = keyword_counts.get("动", 0) > 0
-        has_recoup = keyword_counts.get("补", 0) > 0
-        has_trap = keyword_counts.get("手坑", 0) > 0 or keyword_counts.get("手后坑", 0) > 0
-        has_bugu = keyword_counts.get("补骨趴", 0) > 0
-        has_self = keyword_counts.get("本家", 0) > 0
-
-        chosen = None
-
+        # 如果没有动卡，找动卡
         if not has_moving:
-            for c in new_cards:
-                if "动" in c:
-                    chosen = c
-                    break
+            for card in new_cards:
+                if "动" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
 
-        if chosen is None and not has_recoup:
-            for c in new_cards:
-                if "补" in c:
-                    chosen = c
-                    break
+        # 如果没有补卡，找补卡
+        if not has_recoup:
+            for card in new_cards:
+                if "补" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
 
-        if chosen is None and not has_self:
-            for c in new_cards:
-                if "本家" in c:
-                    chosen = c
-                    break
+        # 如果没有本家，找本家（保留旧逻辑条件判断不变）
+        if not has_moving:
+            for card in new_cards:
+                if "本家" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
 
-        if chosen is None and not has_trap:
-            for c in new_cards:
-                if "手坑" in c:
-                    chosen = c.replace("手坑", "手后坑")
-                    break
+        # 如果没有手坑，找手坑
+        if not has_trap:
+            for card in new_cards:
+                if "手坑" in card:
+                    modified_card = card.replace("手坑", "手后坑")
+                    drawn_cards.append(modified_card)
+                    return drawn_cards
 
-        if chosen is None and has_moving and not has_bugu:
-            for c in new_cards:
-                if "补骨趴" in c:
-                    chosen = c
-                    break
+        # 如果有动卡并且没有补骨趴，找补骨趴
+        if has_moving and not has_bugu_pa:
+            for card in new_cards:
+                if "补骨趴" in card:
+                    drawn_cards.append(card)
+                    return drawn_cards
 
-        if chosen is None and new_cards:
-            fallback = new_cards[0]
-            if "手坑" in fallback:
-                fallback = fallback.replace("手坑", "手后坑")
-            chosen = "后置" + fallback
+        # 如果没有符合条件的卡片，选择第一张卡并加上“后置”前缀
+        fallback = new_cards[0]
+        if "手坑" in fallback:
+            fallback = fallback.replace("手坑", "手后坑")
+        drawn_cards.append("后置" + fallback)
 
-        if chosen is not None:
-            drawn_cards.append(chosen)
-            add_card_to_keyword_counts(chosen, keyword_counts)
+    # 如果手牌中有“强贪”
+    if any("强贪" in card for card in drawn_cards):
+        remaining_cards = get_remaining_cards(card_pool, drawn_cards)
+        remaining_cards = remaining_cards[10:]  # 删除 10 张卡片
+        new_cards = draw_cards(remaining_cards, 2)
+        drawn_cards.append("后置" + new_cards[0])
 
-    elif has_qiangtan:
-        # 强贪：跳过 10 张（除外），再摸 2 张，手上只加 1 张（加“后置”前缀）
-        pos += 10
-        new_cards = deck[pos:pos + 2]
-        pos += 2
-        if new_cards:
-            chosen = "后置" + new_cards[0]
-            drawn_cards.append(chosen)
-            add_card_to_keyword_counts(chosen, keyword_counts)
+    return drawn_cards
 
-    # 5. 追加抽卡：自奏 / 暗抽 / 见神，保持原有条件和顺序
-    if keyword_counts.get("主音", 0) >= 1 and keyword_counts.get("自奏", 0) >= 2:
-        extra = deck[pos:pos + 2]
-        pos += 2
-        drawn_cards.extend(extra)
-        add_cards_to_keyword_counts(extra, keyword_counts)
 
-    if keyword_counts.get("暗抽", 0) >= 1 and keyword_counts.get("暗", 0) >= 2:
-        extra = deck[pos:pos + 2]
-        pos += 2
-        drawn_cards.extend(extra)
-        add_cards_to_keyword_counts(extra, keyword_counts)
+def zizou(drawn_cards, card_pool):
+    """
+    检测牌型中是否有大于等于1的主音和大于等于2的自奏。
+    如果满足条件，则再抽两张牌。
+    """
+    main_tone_count = sum(1 for card in drawn_cards if "主音" in card)
+    self_play_count = sum(1 for card in drawn_cards if "自奏" in card)
 
-    js = keyword_counts.get("见神", 0)
-    fast = keyword_counts.get("速攻", 0)
-    home = keyword_counts.get("本家", 0)
-    if js >= 1 and (fast >= 2 or home >= 2):
-        extra = deck[pos:pos + 2]
-        pos += 2
-        drawn_cards.extend(extra)
-        add_cards_to_keyword_counts(extra, keyword_counts)
+    if main_tone_count >= 1 and self_play_count >= 2:
+        remaining_cards = get_remaining_cards(card_pool, drawn_cards)
+        new_cards = draw_cards(remaining_cards, 2)
+        drawn_cards.extend(new_cards)
 
-    # 6. 检查条件列表，按优先级找到第一个匹配的情况
-    matched_index = None
-    matched_condition = None
+    return drawn_cards
 
-    for i, cond in enumerate(conditions_list):
-        if check_conditions(drawn_cards, cond):
-            matched_index = i
-            matched_condition = cond
-            break
 
-    return matched_index, matched_condition, drawn_cards
+def anchou(drawn_cards, card_pool):
+    """
+    码丽丝的暗抽。
+    """
+    main_tone_count = sum(1 for card in drawn_cards if "暗抽" in card)
+    self_play_count = sum(1 for card in drawn_cards if "暗" in card)
+
+    if main_tone_count >= 1 and self_play_count >= 2:
+        remaining_cards = get_remaining_cards(card_pool, drawn_cards)
+        new_cards = draw_cards(remaining_cards, 2)
+        drawn_cards.extend(new_cards)
+
+    return drawn_cards
+
+
+def jianshen(drawn_cards, card_pool):
+    """
+    检测牌型中符合见神启动的牌型。
+    如果满足条件，则再抽两张牌。
+    """
+    main_tone_count = sum(1 for card in drawn_cards if "见神" in card)
+    self_play_count = sum(1 for card in drawn_cards if "速攻" in card)
+    xuanlan_count = sum(1 for card in drawn_cards if "本家" in card)
+
+    if main_tone_count >= 1 and (self_play_count >= 2 or xuanlan_count >= 2):
+        remaining_cards = get_remaining_cards(card_pool, drawn_cards)
+        new_cards = draw_cards(remaining_cards, 2)
+        drawn_cards.extend(new_cards)
+
+    return drawn_cards
 
 
 def simulate_draws(card_pool, conditions_list):
@@ -212,10 +195,18 @@ def simulate_draws(card_pool, conditions_list):
     drawn_cards_snapshots = []
 
     for draw_num in range(1, num_draws + 1):
-        matched_index, matched_condition, drawn_cards = simulate_single_game(card_pool, conditions_list)
+        drawn_cards = draw_cards(card_pool, draw_size)
+        drawn_cards = handle_pot(drawn_cards, card_pool)
+        drawn_cards = zizou(drawn_cards, card_pool)
+        drawn_cards = jianshen(drawn_cards, card_pool)
+        drawn_cards = anchou(drawn_cards, card_pool)
 
-        if matched_index is not None:
-            condition_counts[matched_index] += 1
+        matched_condition = None
+        for i, condition_set in enumerate(conditions_list):
+            if check_conditions(drawn_cards, condition_set):
+                matched_condition = condition_set
+                condition_counts[i] += 1
+                break
 
         if draw_num % num_show == 0:
             drawn_cards_snapshots.append((draw_num, drawn_cards[:], matched_condition))
@@ -229,75 +220,62 @@ def simulate_draws(card_pool, conditions_list):
 
 
 def simulate_and_report(card_pool, conditions_list, title):
-
+    """
+    进行抽卡模拟，记录每 num_show 次的抽卡结果，并输出每个条件的满足概率。
+    """
     probabilities, drawn_cards_snapshots = simulate_draws(card_pool, conditions_list)
 
     report_drawn_cards(drawn_cards_snapshots, conditions_list)
-
     report_probabilities(probabilities, conditions_list, title)
 
 
 def report_drawn_cards(drawn_cards_snapshots, conditions_list):
-
+    """
+    输出每 num_show 次抽卡的结果。
+    """
     for draw_num, cards, matched_condition in drawn_cards_snapshots:
-
         if matched_condition:
-
-            idx = conditions_list.index(matched_condition) + 1
-
-            print(f"第 {draw_num} 次抽卡结果: {cards}，符合条件情况: {idx}")
-
+            condition_index = conditions_list.index(matched_condition) + 1
+            print(f"第 {draw_num} 次抽卡结果: {cards}，符合条件情况: {condition_index}")
         else:
-
             print(f"第 {draw_num} 次抽卡结果: {cards}，没有匹配的条件")
 
 
 def report_probabilities(probabilities, conditions_list, title):
-
+    """
+    输出每个条件的满足概率，并计算和输出每前 N 种情况的累计概率。
+    """
     print("抽卡结束，满足条件的概率如下：")
 
-    total = 0
-    cumulative = 0
-    cumulative_list = []
+    total_probability = 0
+    cumulative_probability = 0
+    cumulative_probabilities = []
 
     for i, prob in probabilities.items():
-
-        cond_str = "，".join(
-            [f"{p[0]} {p[1]} {p[2]}" for p in conditions_list[i]]
+        condition_str = "，".join(
+            [f"{part[0]} {part[1]} {part[2]}" for part in conditions_list[i]]
         )
+        print(f"情况{i + 1}: {condition_str} 的概率为 {prob:.2%}")
 
-        print(f"情况{i+1}: {cond_str} 的概率为 {prob:.2%}")
-
-        total += prob
-        cumulative += prob
+        total_probability += prob
+        cumulative_probability += prob
 
         if (i + 1) % N == 0:
-
-            print(f"前 {i+1} 种情况的累计概率为: {cumulative:.2%}")
-
-            cumulative_list.append(cumulative)
+            print(f"前 {i + 1} 种情况的累计概率为: {cumulative_probability:.2%}")
+            cumulative_probabilities.append(cumulative_probability)
 
     if len(probabilities) % N != 0:
+        print(f"前 {len(probabilities)} 种情况的累计概率为: {cumulative_probability:.2%}")
+        cumulative_probabilities.append(cumulative_probability)
 
-        print(f"前 {len(probabilities)} 种情况的累计概率为: {cumulative:.2%}")
-
-        cumulative_list.append(cumulative)
-
-    print(f"所有情况的总概率为: {total:.2%}")
+    print(f"所有情况的总概率为: {total_probability:.2%}")
 
     print("\n累计概率汇总：")
 
-    if len(cumulative_list) == 1:
-
-        print(f"累计概率为: {cumulative_list[0]:.2%}")
-
+    if len(cumulative_probabilities) == 1:
+        print(f"累计概率为: {cumulative_probabilities[0]:.2%}")
     else:
-
-        for i, prob in enumerate(cumulative_list, start=1):
-
-            title_text = title[i-1] if i-1 < len(title) else "无标题"
-
-            count_text = min(i * N, len(probabilities))
-
-            print(f"前 {count_text} 种情况({title_text})的累计概率为: {prob:.2%}")
+        for i, prob in enumerate(cumulative_probabilities, start=1):
+            title_text = title[i - 1] if i - 1 < len(title) else "无标题"
+            print(f"前 {i * N} 种情况({title_text})的累计概率为: {prob:.2%}")
 
