@@ -1,14 +1,14 @@
 import file_read
 import probability
-
-
+N=8
+#总情况下一个小情况里的数量
 def main():
     """
     主函数，负责协调整个流程。
     """
     # 定义文件路径
-    first_document_path = "构筑与启动/征服斗魂构筑 .txt"
-    second_document_path = "构筑与启动/征服斗魂启动.txt"
+    first_document_path = "构筑与启动/祈夏sf杀音构筑改版紧急喷气.txt"
+    second_document_path = "构筑与启动/t0杀音启动.txt"
 
     # 读取文件内容
     #卡组

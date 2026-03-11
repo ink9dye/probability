@@ -3,10 +3,10 @@ from collections import Counter
 import secrets
 import time
 draw_size=5
-num_draws=100000
+num_draws=200000
 # 定义全局变量 N，用于每次输出累计概率的步长
-num_show=20000
-N =11  # 例如每次统计前11种情况的累计概率
+num_show=10000
+from main import N
 # 定义全局变量 pot_card_number，控制壶抽取的数量
 pot_card_number = 6
 
@@ -169,6 +169,25 @@ def anchou(drawn_cards, card_pool):
 
     return drawn_cards
 
+def jianshen(drawn_cards, card_pool):
+    """
+    检测牌型中符合见神启动的牌型
+    如果满足条件，则再抽两张牌。
+    """
+    # 统计见神、速攻和绚岚的数量
+    main_tone_count = sum(1 for card in drawn_cards if "见神" in card)
+    self_play_count = sum(1 for card in drawn_cards if "速攻" in card)
+    xuanlan_count = sum(1 for card in drawn_cards if "本家" in card)
+
+    # 修改条件：有1张见神 AND (有2张速攻 OR 有2张绚岚)
+    if main_tone_count >= 1 and (self_play_count >= 2 or xuanlan_count >= 2):
+        # 从剩余的卡中抽取两张新卡
+        remaining_cards = [card for card in card_pool if card not in drawn_cards]
+        new_cards = draw_cards(remaining_cards, 2)
+        drawn_cards.extend(new_cards)  # 将新抽的牌加入手牌
+
+    return drawn_cards
+
 
 def simulate_draws(card_pool, conditions_list):
     condition_counts = {i: 0 for i in range(len(conditions_list))}
@@ -178,6 +197,7 @@ def simulate_draws(card_pool, conditions_list):
         drawn_cards = draw_cards(card_pool, draw_size)
         drawn_cards = handle_pot(drawn_cards, card_pool)
         drawn_cards = zizou(drawn_cards, card_pool)  # 调用 zizou 函数
+        drawn_cards = jianshen(drawn_cards, card_pool)  # 调用 jianshen函数
         drawn_cards = anchou(drawn_cards, card_pool)  # 调用 anchou 函数
 
         matched_condition = None
