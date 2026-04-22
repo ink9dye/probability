@@ -1,10 +1,9 @@
 import random
 from collections import Counter
-from main import N
 
 draw_size = 5
-num_draws = 200000     # 经验上误差约在 0.1% 左右
-num_show = 10000
+num_draws = 300000     # 经验上误差约在 0.1% 左右
+num_show = 30000
 pot_card_number = 6
 
 _rng = random.Random()
@@ -219,14 +218,14 @@ def simulate_draws(card_pool, conditions_list):
     return probabilities, drawn_cards_snapshots
 
 
-def simulate_and_report(card_pool, conditions_list, title):
+def simulate_and_report(card_pool, conditions_list, title, group_sizes):
     """
     进行抽卡模拟，记录每 num_show 次的抽卡结果，并输出每个条件的满足概率。
     """
     probabilities, drawn_cards_snapshots = simulate_draws(card_pool, conditions_list)
 
     report_drawn_cards(drawn_cards_snapshots, conditions_list)
-    report_probabilities(probabilities, conditions_list, title)
+    report_probabilities(probabilities, conditions_list, title, group_sizes)
 
 
 def report_drawn_cards(drawn_cards_snapshots, conditions_list):
@@ -241,41 +240,51 @@ def report_drawn_cards(drawn_cards_snapshots, conditions_list):
             print(f"第 {draw_num} 次抽卡结果: {cards}，没有匹配的条件")
 
 
-def report_probabilities(probabilities, conditions_list, title):
+def report_probabilities(probabilities, conditions_list, title, group_sizes):
     """
-    输出每个条件的满足概率，并计算和输出每前 N 种情况的累计概率。
+    输出每个条件的满足概率，并根据批注(# 开头的行)自动分组，
+    打印到每个批注为止的累计概率。
     """
     print("抽卡结束，满足条件的概率如下：")
 
-    total_probability = 0
-    cumulative_probability = 0
-    cumulative_probabilities = []
+    total_probability = 0.0
 
+    # 先逐个情况打印单独概率
     for i, prob in probabilities.items():
         condition_str = "，".join(
             [f"{part[0]} {part[1]} {part[2]}" for part in conditions_list[i]]
         )
         print(f"情况{i + 1}: {condition_str} 的概率为 {prob:.2%}")
-
         total_probability += prob
-        cumulative_probability += prob
-
-        if (i + 1) % N == 0:
-            print(f"前 {i + 1} 种情况的累计概率为: {cumulative_probability:.2%}")
-            cumulative_probabilities.append(cumulative_probability)
-
-    if len(probabilities) % N != 0:
-        print(f"前 {len(probabilities)} 种情况的累计概率为: {cumulative_probability:.2%}")
-        cumulative_probabilities.append(cumulative_probability)
 
     print(f"所有情况的总概率为: {total_probability:.2%}")
-
     print("\n累计概率汇总：")
 
-    if len(cumulative_probabilities) == 1:
-        print(f"累计概率为: {cumulative_probabilities[0]:.2%}")
-    else:
-        for i, prob in enumerate(cumulative_probabilities, start=1):
-            title_text = title[i - 1] if i - 1 < len(title) else "无标题"
-            print(f"前 {i * N} 种情况({title_text})的累计概率为: {prob:.2%}")
+    # 再根据 group_sizes 汇总每个批注下的累计概率（真正“从头累加”的累计制）
+    group_start = 0
+    cumulative = 0.0
+
+    for idx, size in enumerate(group_sizes):
+        group_end = group_start + size  # 不含 group_end
+        if group_end > len(probabilities):
+            group_end = len(probabilities)
+
+        if group_end <= group_start:
+            continue
+
+        # 本组新增的概率
+        group_prob = sum(
+            probabilities[i] for i in range(group_start, group_end)
+        )
+        # 累加到前几组的总和
+        cumulative += group_prob
+
+        title_text = title[idx] if idx < len(title) else "无标题"
+        print(
+            f"前 {group_end} 种情况({title_text})的累计概率为: {cumulative:.2%}"
+        )
+
+        group_start = group_end
+        if group_start >= len(probabilities):
+            break
 
