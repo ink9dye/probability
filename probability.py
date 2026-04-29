@@ -8,6 +8,36 @@ pot_card_number = 6
 
 _rng = random.Random()
 
+# 「前缀-种类」：后缀固定为半角 -种类；度量为手牌中含该前缀的不同牌名种数（同名多张只算 1）
+_KIND_SUFFIX = "-种类"
+
+
+def _is_kind_condition(card_name):
+    return card_name.endswith(_KIND_SUFFIX) and len(card_name) > len(_KIND_SUFFIX)
+
+
+def _kind_prefix(card_name):
+    return card_name[: -len(_KIND_SUFFIX)]
+
+
+def _special_condition_value(card_name, drawn_cards):
+    """
+    返回保留条件名对应的度量；未知名返回 None，由调用方回退到普通子串计数。
+
+    {前缀}-种类：牌名字符串包含「前缀」的不同牌名种数（用于避免两张同名牌计成两种）。
+    """
+    if _is_kind_condition(card_name):
+        prefix = _kind_prefix(card_name)
+        if not prefix:
+            return None
+        return len({c for c in drawn_cards if prefix in c})
+    return None
+
+
+def _skip_substring_count(card_name):
+    """不参与「子串出现次数」累加的条件名。"""
+    return _is_kind_condition(card_name)
+
 
 def draw_cards(card_pool, draw_count):
     """
@@ -34,16 +64,24 @@ def get_remaining_cards(card_pool, drawn_cards):
 def check_conditions(drawn_cards, conditions):
     """
     检查抽取的卡片是否符合给定条件集合。
+    普通项：统计手牌中「牌名字符串包含 card_name 子串」的张数。
+    保留项：{前缀}-种类 — 见 _special_condition_value。
     """
     card_counts = Counter()
 
     for card in drawn_cards:
         for card_name, operator, value in conditions:
+            if _skip_substring_count(card_name):
+                continue
             if card_name in card:
                 card_counts[card_name] += 1
 
     for card_name, operator, value in conditions:
-        card_count = card_counts.get(card_name, 0)
+        special = _special_condition_value(card_name, drawn_cards)
+        if special is not None:
+            card_count = special
+        else:
+            card_count = card_counts.get(card_name, 0)
         if operator == "大于等于" and card_count < value:
             return False
         elif operator == "大于" and card_count <= value:

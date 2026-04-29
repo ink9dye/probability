@@ -7,7 +7,7 @@ def main():
     主函数，负责协调整个流程。
     """
     # 定义文件路径
-    first_document_path = "构筑与启动/0402魔法师均构筑.txt"
+    first_document_path = "构筑与启动/雨sf0422魔女术魔法师均构筑.txt"
     second_document_path = "构筑与启动/魔法师均启动.txt"
 
     # 读取文件内容
