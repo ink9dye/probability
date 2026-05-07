@@ -50,6 +50,34 @@ def draw_cards(card_pool, draw_count):
     return _rng.sample(card_pool, draw_count)
 
 
+def _draw_one_inplace(remaining_cards):
+    """
+    从 remaining_cards 中随机抽 1 张，并从列表中移除该张（避免重复抽到同一张）。
+    """
+    if not remaining_cards:
+        raise ValueError("没有可抽取的剩余卡片")
+    idx = _rng.randrange(len(remaining_cards))
+    return remaining_cards.pop(idx)
+
+
+def handle_fake_g_going_second(drawn_cards, card_pool, draw_times=1):
+    """
+    后手可选逻辑：
+    启动处理结束后，若手牌中存在包含“假g”的卡，则视为“抽到就抽一”（类似壶），
+    从剩余卡组随机抽若干张，并以“后置”前缀加入手牌（不替换/不移除原“假g”卡）。
+    """
+    if draw_times <= 0:
+        return drawn_cards
+
+    remaining_cards = get_remaining_cards(card_pool, drawn_cards)
+    for _ in range(draw_times):
+        if not remaining_cards:
+            break
+        drawn_cards.append("后置" + _draw_one_inplace(remaining_cards))
+
+    return drawn_cards
+
+
 def get_remaining_cards(card_pool, drawn_cards):
     """
     按“旧逻辑”实现的剩余卡：
@@ -227,16 +255,29 @@ def jianshen(drawn_cards, card_pool):
     return drawn_cards
 
 
-def simulate_draws(card_pool, conditions_list):
+def simulate_draws(card_pool, conditions_list, enable_going_second=False):
     condition_counts = {i: 0 for i in range(len(conditions_list))}
     drawn_cards_snapshots = []
 
     for draw_num in range(1, num_draws + 1):
-        drawn_cards = draw_cards(card_pool, draw_size)
+        initial_draw_size = draw_size + (1 if enable_going_second else 0)
+        drawn_cards = draw_cards(card_pool, initial_draw_size)
+        # 后手第六抽（额外起手那张）不计入“假g 触发抽一”的判定：只看前 5 张起手。
+        fake_g_count = sum(1 for card in drawn_cards[:draw_size] if "假g" in card)
+        fake_g_draw_times = 0
+        if enable_going_second:
+            if fake_g_count >= 2:
+                fake_g_draw_times = 2
+            elif fake_g_count == 1:
+                fake_g_draw_times = 1
         drawn_cards = handle_pot(drawn_cards, card_pool)
         drawn_cards = zizou(drawn_cards, card_pool)
         drawn_cards = jianshen(drawn_cards, card_pool)
         drawn_cards = anchou(drawn_cards, card_pool)
+        if fake_g_draw_times:
+            drawn_cards = handle_fake_g_going_second(
+                drawn_cards, card_pool, draw_times=fake_g_draw_times
+            )
 
         matched_condition = None
         for i, condition_set in enumerate(conditions_list):
@@ -256,11 +297,13 @@ def simulate_draws(card_pool, conditions_list):
     return probabilities, drawn_cards_snapshots
 
 
-def simulate_and_report(card_pool, conditions_list, title, group_sizes):
+def simulate_and_report(card_pool, conditions_list, title, group_sizes, enable_going_second=False):
     """
     进行抽卡模拟，记录每 num_show 次的抽卡结果，并输出每个条件的满足概率。
     """
-    probabilities, drawn_cards_snapshots = simulate_draws(card_pool, conditions_list)
+    probabilities, drawn_cards_snapshots = simulate_draws(
+        card_pool, conditions_list, enable_going_second=enable_going_second
+    )
 
     report_drawn_cards(drawn_cards_snapshots, conditions_list)
     report_probabilities(probabilities, conditions_list, title, group_sizes)
