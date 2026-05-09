@@ -30,7 +30,13 @@ def main():
         return
 
     # 解析文档内容
-    card_pool, conditions_list, group_sizes = file_read.parse_documents(first_document_content, second_document_content)
+    (
+        card_pool,
+        conditions_list,
+        group_sizes,
+        amphibian_merge_one_rules,
+        dong_merge_rules,
+    ) = file_read.parse_documents(first_document_content, second_document_content)
 
     # 进行抽卡模拟并输出结果
     probability.simulate_and_report(
@@ -39,6 +45,8 @@ def main():
         title,
         group_sizes,
         enable_going_second=enable_going_second,
+        amphibian_merge_one_rules=amphibian_merge_one_rules,
+        dong_merge_rules=dong_merge_rules,
     )
 
 

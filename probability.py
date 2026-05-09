@@ -12,6 +12,69 @@ _rng = random.Random()
 _KIND_SUFFIX = "-种类"
 
 
+def _strip_leading_post(card):
+    return card[2:] if card.startswith("后置") else card
+
+
+def _hand_has_exact_pool_card(drawn_cards, pool_name):
+    return any(_strip_leading_post(c) == pool_name for c in drawn_cards)
+
+
+def _amphibian_substring_count_merged(drawn_cards, substring, merge_rules):
+    """
+    含 substring 的张数；每条已触发的 @两栖齐现只算一张 规则会把该组内匹配 substring 的张合并为计 1。
+    """
+    cnt = sum(1 for c in drawn_cards if substring in c)
+    for name_tuple in merge_rules:
+        names_set = set(name_tuple)
+        if not all(_hand_has_exact_pool_card(drawn_cards, n) for n in name_tuple):
+            continue
+        k = sum(
+            1
+            for c in drawn_cards
+            if _strip_leading_post(c) in names_set and substring in c
+        )
+        if k >= 2:
+            cnt -= k - 1
+    return cnt
+
+
+def _amphibian_kind_count_merged(drawn_cards, merge_rules):
+    """
+    「两栖-种类」：手牌中含「两栖」的不同牌实例种数，再对每条齐现规则把组内多种合并减 1。
+    """
+    distinct = {c for c in drawn_cards if "两栖" in c}
+    n = len(distinct)
+    for name_tuple in merge_rules:
+        names_set = set(name_tuple)
+        if not all(_hand_has_exact_pool_card(drawn_cards, x) for x in name_tuple):
+            continue
+        amphib_from_rule = {c for c in distinct if _strip_leading_post(c) in names_set}
+        if len(amphib_from_rule) >= 2:
+            n -= len(amphib_from_rule) - 1
+    return n
+
+
+def _dong_count_adjusted(drawn_cards, dong_merge_rules=()):
+    """
+    统计条件名「动」：先按手牌中含子串「动」的张数计数，再对每个已触发的
+    @齐现只算一张动 规则合并——该规则所列牌名均在手牌中至少各 1 张时，
+    这些牌名对应的所有张里若有多张含「动」则只保留 1 张的量；若均不含「动」则补 1（整套算 1 动）。
+    """
+    cnt = sum(1 for c in drawn_cards if "动" in c)
+    for name_tuple in dong_merge_rules:
+        names_set = set(name_tuple)
+        if not all(_hand_has_exact_pool_card(drawn_cards, n) for n in name_tuple):
+            continue
+        pair_cards = [c for c in drawn_cards if _strip_leading_post(c) in names_set]
+        d = sum(1 for c in pair_cards if "动" in c)
+        if d >= 2:
+            cnt -= d - 1
+        elif d == 0:
+            cnt += 1
+    return cnt
+
+
 def _is_kind_condition(card_name):
     return card_name.endswith(_KIND_SUFFIX) and len(card_name) > len(_KIND_SUFFIX)
 
@@ -20,16 +83,19 @@ def _kind_prefix(card_name):
     return card_name[: -len(_KIND_SUFFIX)]
 
 
-def _special_condition_value(card_name, drawn_cards):
+def _special_condition_value(card_name, drawn_cards, amphibian_merge_one_rules):
     """
     返回保留条件名对应的度量；未知名返回 None，由调用方回退到普通子串计数。
 
     {前缀}-种类：牌名字符串包含「前缀」的不同牌名种数（用于避免两张同名牌计成两种）。
+    前缀为「两栖」时应用 @两栖齐现只算一张 合并。
     """
     if _is_kind_condition(card_name):
         prefix = _kind_prefix(card_name)
         if not prefix:
             return None
+        if prefix == "两栖":
+            return _amphibian_kind_count_merged(drawn_cards, amphibian_merge_one_rules)
         return len({c for c in drawn_cards if prefix in c})
     return None
 
@@ -89,23 +155,46 @@ def get_remaining_cards(card_pool, drawn_cards):
     return [card for card in card_pool if card not in drawn_set]
 
 
-def check_conditions(drawn_cards, conditions):
+def check_conditions(
+    drawn_cards,
+    conditions,
+    amphibian_merge_one_rules=(),
+    dong_merge_rules=(),
+):
     """
     检查抽取的卡片是否符合给定条件集合。
     普通项：统计手牌中「牌名字符串包含 card_name 子串」的张数。
     保留项：{前缀}-种类 — 见 _special_condition_value。
+    amphibian_merge_one_rules：@两栖齐现只算一张；影响「两栖」「魔牌两栖」「两栖-种类」。
+    dong_merge_rules：@齐现只算一张动；仅影响条件键恰好为「动」的计数。
     """
     card_counts = Counter()
+    dong_adjusted = _dong_count_adjusted(drawn_cards, dong_merge_rules)
 
-    for card in drawn_cards:
-        for card_name, operator, value in conditions:
-            if _skip_substring_count(card_name):
-                continue
+    for card_name, operator, value in conditions:
+        if _skip_substring_count(card_name):
+            continue
+        if card_name == "动":
+            card_counts[card_name] = dong_adjusted
+            continue
+        if card_name == "两栖":
+            card_counts[card_name] = _amphibian_substring_count_merged(
+                drawn_cards, "两栖", amphibian_merge_one_rules
+            )
+            continue
+        if card_name == "魔牌两栖":
+            card_counts[card_name] = _amphibian_substring_count_merged(
+                drawn_cards, "魔牌两栖", amphibian_merge_one_rules
+            )
+            continue
+        for card in drawn_cards:
             if card_name in card:
                 card_counts[card_name] += 1
 
     for card_name, operator, value in conditions:
-        special = _special_condition_value(card_name, drawn_cards)
+        special = _special_condition_value(
+            card_name, drawn_cards, amphibian_merge_one_rules
+        )
         if special is not None:
             card_count = special
         else:
@@ -255,7 +344,13 @@ def jianshen(drawn_cards, card_pool):
     return drawn_cards
 
 
-def simulate_draws(card_pool, conditions_list, enable_going_second=False):
+def simulate_draws(
+    card_pool,
+    conditions_list,
+    enable_going_second=False,
+    amphibian_merge_one_rules=(),
+    dong_merge_rules=(),
+):
     condition_counts = {i: 0 for i in range(len(conditions_list))}
     drawn_cards_snapshots = []
 
@@ -281,7 +376,12 @@ def simulate_draws(card_pool, conditions_list, enable_going_second=False):
 
         matched_condition = None
         for i, condition_set in enumerate(conditions_list):
-            if check_conditions(drawn_cards, condition_set):
+            if check_conditions(
+                drawn_cards,
+                condition_set,
+                amphibian_merge_one_rules,
+                dong_merge_rules,
+            ):
                 matched_condition = condition_set
                 condition_counts[i] += 1
                 break
@@ -297,12 +397,24 @@ def simulate_draws(card_pool, conditions_list, enable_going_second=False):
     return probabilities, drawn_cards_snapshots
 
 
-def simulate_and_report(card_pool, conditions_list, title, group_sizes, enable_going_second=False):
+def simulate_and_report(
+    card_pool,
+    conditions_list,
+    title,
+    group_sizes,
+    enable_going_second=False,
+    amphibian_merge_one_rules=(),
+    dong_merge_rules=(),
+):
     """
     进行抽卡模拟，记录每 num_show 次的抽卡结果，并输出每个条件的满足概率。
     """
     probabilities, drawn_cards_snapshots = simulate_draws(
-        card_pool, conditions_list, enable_going_second=enable_going_second
+        card_pool,
+        conditions_list,
+        enable_going_second=enable_going_second,
+        amphibian_merge_one_rules=amphibian_merge_one_rules,
+        dong_merge_rules=dong_merge_rules,
     )
 
     report_drawn_cards(drawn_cards_snapshots, conditions_list)
