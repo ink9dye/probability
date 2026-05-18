@@ -1,19 +1,52 @@
+import os
 import random
+import re
 from collections import Counter
 
 draw_size = 5
-num_draws = 300000     # 经验上误差约在 0.1% 左右
-num_show = 30000
+# 单次模拟次数越大，比例估计的标准误越小（约 ∝ 1/√N）；默认较原 30 万略增以缩小随机抖动。
+# 环境变量 PROB_SIM_N 可覆盖次数（仅影响数值与耗时，不改变打印格式）。
+_raw_n = os.environ.get("PROB_SIM_N", "").strip()
+try:
+    num_draws = max(1000, int(_raw_n)) if _raw_n else 400000
+except ValueError:
+    num_draws = 400000
+del _raw_n
+num_show = 50000
 pot_card_number = 6
 
 _rng = random.Random()
 
+
+def _seed_rng_from_env() -> int | None:
+    """若环境变量 PROB_SIM_SEED 为整数则固定 RNG；返回所用种子或 None。"""
+    raw = os.environ.get("PROB_SIM_SEED", "").strip()
+    if not raw:
+        return None
+    try:
+        v = int(raw)
+    except ValueError:
+        return None
+    _rng.seed(v)
+    return v
+
+
 # 「前缀-种类」：后缀固定为半角 -种类；度量为手牌中含该前缀的不同牌名种数（同名多张只算 1）
 _KIND_SUFFIX = "-种类"
 
+# 「种类」求和条件里连接多项的分隔符（半角/全角加号）
+_KIND_SUM_PLUS_SPLIT = ("+", "＋")
+
+
+_SANCAI_MARK = "后置三才"
+
 
 def _strip_leading_post(card):
-    return card[2:] if card.startswith("后置") else card
+    if card.endswith(_SANCAI_MARK):
+        card = card[: -len(_SANCAI_MARK)]
+    if card.startswith("后置"):
+        return card[2:]
+    return card
 
 
 def _hand_has_exact_pool_card(drawn_cards, pool_name):
@@ -75,12 +108,38 @@ def _dong_count_adjusted(drawn_cards, dong_merge_rules=()):
     return cnt
 
 
+def _split_kind_sum_parts(card_name):
+    """按加号拆「种类」求和表达式；无加号则返回单元素列表。"""
+    if not any(p in card_name for p in _KIND_SUM_PLUS_SPLIT):
+        return [card_name]
+    pattern = "|".join(re.escape(p) for p in _KIND_SUM_PLUS_SPLIT)
+    return [p.strip() for p in re.split(pattern, card_name) if p.strip()]
+
+
 def _is_kind_condition(card_name):
+    if any(p in card_name for p in _KIND_SUM_PLUS_SPLIT):
+        return False
     return card_name.endswith(_KIND_SUFFIX) and len(card_name) > len(_KIND_SUFFIX)
+
+
+def _is_kind_sum_condition(card_name):
+    """
+    形如「两栖-种类+后手-种类」：多项均为「前缀-种类」，用 + / ＋ 连接，表示各类种数之和。
+    """
+    parts = _split_kind_sum_parts(card_name)
+    return len(parts) >= 2 and all(_is_kind_condition(p) for p in parts)
 
 
 def _kind_prefix(card_name):
     return card_name[: -len(_KIND_SUFFIX)]
+
+
+def _kind_metric_for_prefix(prefix, drawn_cards, amphibian_merge_one_rules):
+    if not prefix:
+        return None
+    if prefix == "两栖":
+        return _amphibian_kind_count_merged(drawn_cards, amphibian_merge_one_rules)
+    return len({c for c in drawn_cards if prefix in c})
 
 
 def _special_condition_value(card_name, drawn_cards, amphibian_merge_one_rules):
@@ -89,20 +148,28 @@ def _special_condition_value(card_name, drawn_cards, amphibian_merge_one_rules):
 
     {前缀}-种类：牌名字符串包含「前缀」的不同牌名种数（用于避免两张同名牌计成两种）。
     前缀为「两栖」时应用 @两栖齐现只算一张 合并。
+    若干「前缀-种类」用 + / ＋ 连接时，度量为各项种数之和（同一牌可同时计入多项前缀种类时，总和会重复计该牌）。
     """
+    if _is_kind_sum_condition(card_name):
+        total = 0
+        for p in _split_kind_sum_parts(card_name):
+            if not _is_kind_condition(p):
+                return None
+            prefix = _kind_prefix(p)
+            v = _kind_metric_for_prefix(prefix, drawn_cards, amphibian_merge_one_rules)
+            if v is None:
+                return None
+            total += v
+        return total
     if _is_kind_condition(card_name):
         prefix = _kind_prefix(card_name)
-        if not prefix:
-            return None
-        if prefix == "两栖":
-            return _amphibian_kind_count_merged(drawn_cards, amphibian_merge_one_rules)
-        return len({c for c in drawn_cards if prefix in c})
+        return _kind_metric_for_prefix(prefix, drawn_cards, amphibian_merge_one_rules)
     return None
 
 
 def _skip_substring_count(card_name):
     """不参与「子串出现次数」累加的条件名。"""
-    return _is_kind_condition(card_name)
+    return _is_kind_condition(card_name) or _is_kind_sum_condition(card_name)
 
 
 def draw_cards(card_pool, draw_count):
@@ -129,8 +196,9 @@ def _draw_one_inplace(remaining_cards):
 def handle_fake_g_going_second(drawn_cards, card_pool, draw_times=1):
     """
     后手可选逻辑：
-    启动处理结束后，若手牌中存在包含“假g”的卡，则视为“抽到就抽一”（类似壶），
-    从剩余卡组随机抽若干张，并以“后置”前缀加入手牌（不替换/不移除原“假g”卡）。
+    随机起手后，若开启后手模式且「最初 5 张起手」中含「假g」，则按张数再抽：
+    1 张假 g → draw_times 为 1；两张及以上 → draw_times 为 2。
+    以「后置」前缀加入手牌（不移除原假 g 卡）。
     """
     if draw_times <= 0:
         return drawn_cards
@@ -164,7 +232,7 @@ def check_conditions(
     """
     检查抽取的卡片是否符合给定条件集合。
     普通项：统计手牌中「牌名字符串包含 card_name 子串」的张数。
-    保留项：{前缀}-种类 — 见 _special_condition_value。
+    保留项：{前缀}-种类，以及用「+」连接的多种类之和（如 两栖-种类+后手-种类）— 见 _special_condition_value。
     amphibian_merge_one_rules：@两栖齐现只算一张；影响「两栖」「魔牌两栖」「两栖-种类」。
     dong_merge_rules：@齐现只算一张动；仅影响条件键恰好为「动」的计数。
     """
@@ -211,6 +279,383 @@ def check_conditions(
             return False
 
     return True
+
+
+def _dai_man_shuffle_tier(
+    card,
+    fake_g_ref_first_5,
+    hand_before,
+    stripped_shape_counts,
+    *,
+    is_excavated=False,
+    used_sancai=False,
+    used_sanhao=False,
+):
+    """
+    怠慢壶：在「去掉壶后的手牌 ∪ 翻出堆」合并列表上为每张牌算 tier；
+    全局挑出 tier 最小的 n-1 张洗回（同 tier 随机打散），其余一律留在手牌。
+
+    tier 数字（越小越早洗回）：0 真废件（含「真废件」）>
+    1 仅当开局阶段（怠慢壶前）已具备并将结算对应三才或三号时：翻出堆中含「三才」/「三号」的卡（优先洗回）>
+    2 怠慢壶（发动用掉一张后，其余在手或翻出堆中的复数壶优先洗回）>
+    3 五手外假g > 4 废件（含「废件」且非真废件）> 5 两栖后手魔陷 > 6 手坑 >
+    7 皇子+皇国时的皇国 > 8 复数 > 9 其它。
+    真废件与普通废件各自为一档；同档且本次只能洗回其中一部分时：名字含「阿莱」或「熟练」的最优先洗回，
+    其余次之；同档内再按牌名长度短者优先（见 _dai_man_tier1_junk_keys）。
+    tier 9「其它」内部：在全局贪心洗回里处理——裸其它最早洗回；含「两栖」「后手」的牌
+    晚于裸其它，并在剩余池里动态倾向洗回较多的一侧以使保留量接近；「动补」与（仅当全池无动补时的）「动」
+    尽量晚洗回，并在收尾用交换保证至少保留一张动补或一张动（见 _dai_man_pick_remove_indices）。
+    「复数」：当前整段牌型（去掉壶后的手牌 ∪ 翻出堆）里去前缀同名张数 ≥ 2。
+
+    若一张牌命中多类，取 tier **最小值**（更早洗回的一侧生效）。
+    「五手外假g」：含「假g」且去前缀牌名不在 **发动怠慢壶前手牌的前 5 张**
+    （fake_g_ref_first_5）已出现的牌名集合中。
+    """
+    st = _strip_leading_post(card)
+    tiers = []
+    if "真废件" in card:
+        tiers.append(0)
+    if is_excavated and used_sancai and "三才" in card:
+        tiers.append(1)
+    if is_excavated and used_sanhao and "三号" in card:
+        tiers.append(1)
+    if "废件" in card and "真废件" not in card:
+        tiers.append(4)
+    if "两栖后手魔陷" in card:
+        tiers.append(5)
+    if "怠慢壶" in card:
+        tiers.append(2)
+    if "假g" in card:
+        ref_names = {_strip_leading_post(c) for c in fake_g_ref_first_5}
+        if st not in ref_names:
+            tiers.append(3)
+    if "手坑" in card:
+        tiers.append(6)
+    if "皇国" in card:
+        has_huangzi = any("皇子" in c for c in hand_before)
+        has_huangguo = any("皇国" in c for c in hand_before)
+        if has_huangzi and has_huangguo:
+            tiers.append(7)
+    if stripped_shape_counts.get(st, 0) >= 2:
+        tiers.append(8)
+    if not tiers:
+        tiers.append(9)
+    return min(tiers)
+
+
+def _dai_man_tier1_junk_keys(card):
+    """
+    真废件（tier 0）与普通废件（tier 4）内部：越早洗回 sort 键越小。
+    含「阿莱」或「熟练」最优先(0)；其它废件(1)。同档内再按 len(牌名) 升序。
+    """
+    if "阿莱" in card or "熟练" in card:
+        return (0, len(card))
+    return (1, len(card))
+
+
+def _dai_man_removal_sort_key(
+    i,
+    combined,
+    tiers_by_idx,
+    remaining,
+    *,
+    combined_has_dongbu,
+    combined_has_dong,
+):
+    """
+    越小表示本轮越优先洗回。
+    tier 0 / 4 废件档、5 两栖后手魔陷：废件档用阿莱/熟练键；tier 9「其它」用后续各档细分贪心。
+    """
+    tier = tiers_by_idx[i]
+    rnd = _rng.random()
+    c = combined[i]
+    if tier == 0:
+        t1_pri, t1_len = _dai_man_tier1_junk_keys(c)
+        return (tier, t1_pri, t1_len, 0, 0, 0, rnd, i)
+    if tier == 4:
+        t1_pri, t1_len = _dai_man_tier1_junk_keys(c)
+        return (tier, t1_pri, t1_len, 0, 0, 0, rnd, i)
+    if tier == 5:
+        return (tier, 0, len(c), 0, 0, 0, rnd, i)
+    if tier != 9:
+        return (tier, 0, 0, 0, 0, 0, rnd, i)
+
+    need_dong_reserve = (not combined_has_dongbu) and combined_has_dong
+
+    is_db = "动补" in c
+    is_ax = "两栖" in c
+    is_hs = "后手" in c
+    is_dong = "动" in c
+
+    hs_only = is_hs and not is_ax
+    ax_only = is_ax and not is_hs
+    both_ax_hs = is_ax and is_hs
+
+    rh_ex = sum(
+        1
+        for j in remaining
+        if tiers_by_idx[j] == 9
+        and "后手" in combined[j]
+        and "两栖" not in combined[j]
+    )
+    ra_ex = sum(
+        1
+        for j in remaining
+        if tiers_by_idx[j] == 9
+        and "两栖" in combined[j]
+        and "后手" not in combined[j]
+    )
+
+    # 裸其它：无动补、无两栖/后手标签，且不触发「无动补时须留动」的纯动保留
+    if not is_db and not is_ax and not is_hs and not (need_dong_reserve and is_dong):
+        return (tier, 0, 0, 0, 0, 0, rnd, i)
+
+    if is_db:
+        return (tier, 6, 0, 0, 0, 0, rnd, i)
+
+    if need_dong_reserve and is_dong and not is_db:
+        return (tier, 5, 0, 0, 0, 0, rnd, i)
+
+    if both_ax_hs:
+        return (tier, 4, 0, 0, 0, len(c), rnd, i)
+
+    if hs_only:
+        if rh_ex > ra_ex:
+            bal = -1
+        elif rh_ex < ra_ex:
+            bal = 1
+        else:
+            bal = 0
+        return (tier, 3, bal, 0, 0, len(c), rnd, i)
+
+    if ax_only:
+        if ra_ex > rh_ex:
+            bal = -1
+        elif ra_ex < rh_ex:
+            bal = 1
+        else:
+            bal = 0
+        return (tier, 3, bal, 0, 0, len(c), rnd, i)
+
+    return (tier, 2, 0, 0, 0, len(c), rnd, i)
+
+
+def _dai_man_repair_dongbu_dong(combined, tiers_by_idx, rm_indices):
+    """
+    若全池曾存在动补却未保留任一：与同档 tier 交换一张非动补进洗回列。
+    若全池无动补但曾存在「动」却未保留任一：同理交换保留一张动。
+    """
+    rm = set(rm_indices)
+    n = len(combined)
+
+    def keep():
+        return set(range(n)) - rm
+
+    def pool_has(pred):
+        return any(pred(combined[j]) for j in range(n))
+
+    def kept_has(pred):
+        return any(pred(combined[j]) for j in keep())
+
+    def swap_same_tier(i_rm, i_kp):
+        if tiers_by_idx[i_rm] != tiers_by_idx[i_kp]:
+            return False
+        rm.remove(i_rm)
+        rm.add(i_kp)
+        return True
+
+    for _ in range(8):
+        k = keep()
+        chg = False
+
+        if pool_has(lambda c: "动补" in c) and not kept_has(lambda c: "动补" in c):
+            for i_rm in list(rm):
+                if "动补" not in combined[i_rm]:
+                    continue
+                for i_kp in k:
+                    if "动补" in combined[i_kp]:
+                        continue
+                    if swap_same_tier(i_rm, i_kp):
+                        chg = True
+                        break
+                if chg:
+                    break
+
+        if chg:
+            continue
+
+        if (
+            not pool_has(lambda c: "动补" in c)
+            and pool_has(lambda c: "动" in c)
+            and not kept_has(lambda c: "动" in c)
+        ):
+            for i_rm in list(rm):
+                if "动" not in combined[i_rm]:
+                    continue
+                for i_kp in k:
+                    if "动" in combined[i_kp]:
+                        continue
+                    if swap_same_tier(i_rm, i_kp):
+                        chg = True
+                        break
+                if chg:
+                    break
+
+        if not chg:
+            break
+
+    return rm
+
+
+def _dai_man_pick_remove_indices(combined, tiers_by_idx, remove_count):
+    n = len(combined)
+    combined_has_dongbu = any("动补" in combined[i] for i in range(n))
+    combined_has_dong = any("动" in combined[i] for i in range(n))
+    remaining = set(range(n))
+    rm_list = []
+    for _ in range(remove_count):
+        best_key = None
+        best_i = None
+        for i in remaining:
+            key = _dai_man_removal_sort_key(
+                i,
+                combined,
+                tiers_by_idx,
+                remaining,
+                combined_has_dongbu=combined_has_dongbu,
+                combined_has_dong=combined_has_dong,
+            )
+            if best_key is None or key < best_key:
+                best_key = key
+                best_i = i
+        remaining.remove(best_i)
+        rm_list.append(best_i)
+    return _dai_man_repair_dongbu_dong(combined, tiers_by_idx, set(rm_list))
+
+
+_SANHAO_GOING_SECOND_TRAP = "两栖后手魔陷"
+
+
+def apply_going_second_sanhao(drawn_cards):
+    """
+    后手模式（enable going-second yes）：手牌中含「三号」的牌按张替换——
+    若当前手牌已有「怠慢壶」则「三号」→「两栖后手魔陷」，否则「三号」→「怠慢壶」。
+    多张三号从左到右依次判定（先转化的怠慢壶会影响后续三号）。
+    开局阶段三号与本函数一同只结算一次；怠慢壶翻出保留的三号见 apply_going_second_sanhao_excavated_only。
+    """
+    changed = False
+    for i in range(len(drawn_cards)):
+        if "三号" not in drawn_cards[i]:
+            continue
+        has_dai_man = any("怠慢壶" in c for c in drawn_cards)
+        repl = _SANHAO_GOING_SECOND_TRAP if has_dai_man else "怠慢壶"
+        drawn_cards[i] = drawn_cards[i].replace("三号", repl)
+        changed = True
+    return changed
+
+
+def apply_going_second_sanhao_excavated_only(
+    drawn_cards, excav_kept, *, dai_man_was_used=False
+):
+    """
+    仅对手牌中属于怠慢壶翻出且洗完仍留在手里的那些实例做三号替换（ multiset 对齐）。
+    若此时手上已无怠慢壶但本局已发动过怠慢壶，则视为「已有怠慢壶」分支，三号→两栖后手魔陷。
+    """
+    rem = Counter(excav_kept)
+    for i in range(len(drawn_cards)):
+        c = drawn_cards[i]
+        if "三号" not in c:
+            continue
+        if rem[c] <= 0:
+            continue
+        rem[c] -= 1
+        has_pot_in_hand = any("怠慢壶" in x for x in drawn_cards)
+        repl = (
+            _SANHAO_GOING_SECOND_TRAP
+            if (has_pot_in_hand or dai_man_was_used)
+            else "怠慢壶"
+        )
+        drawn_cards[i] = c.replace("三号", repl)
+
+
+def handle_sancai_draw(drawn_cards, card_pool):
+    """
+    若手牌中存在名字含「三才」的卡，则从卡组再随机抽最多 2 张，
+    并在卡名末尾追加后缀「后置三才」（无括号，便于与起手本体区分）。
+    返回是否在本阶段执行了三才结算（含卡组已空、未能实际抽牌的情形）。
+    """
+    if not any("三才" in c for c in drawn_cards):
+        return False
+    remaining_cards = get_remaining_cards(card_pool, drawn_cards)
+    if not remaining_cards:
+        return True
+    n = min(2, len(remaining_cards))
+    for c in draw_cards(remaining_cards, n):
+        drawn_cards.append(c + _SANCAI_MARK)
+    return True
+
+
+def handle_dai_man_pot(drawn_cards, card_pool, n, *, used_sancai=False, used_sanhao=False):
+    """
+    怠慢壶：去掉一张壶后从卡组展示 n 张；洗回哪 n-1 张按优先级在
+    **（先前手牌 ∪ 翻出堆）** 全体上选取——主档 tier 越小越早洗回；tier 9「其它」为贪心多步选取
+    （裸其它最先洗回；两栖/后手洗回次于裸其它且在剩余池内向两类均衡贴近；动补与「仅动」尽量晚洗回，
+    再以交换保证至少保留一张动补或一张动）；真废件与普通废件见 _dai_man_tier1_junk_keys；
+    tier 5 两栖后手魔陷；洗回顺序档见 _dai_man_shuffle_tier 文档。
+    调用前起手须已含「怠慢壶」。
+    used_sancai / used_sanhao：怠慢壶前是否**曾经具备并将结算**三才/三号（三号仅在后手开启且手上有三号时）。
+    仅在为 True 时，翻出堆中对应「三才」「三号」牌才适用 tier 1 优先洗回。
+
+    返回值：(结算后的手牌列表, 打印用三元组, 洗完仍留在手里的翻出堆牌列表)。
+    三元组为 None 表示未发动；否则为 (发动前手牌, 去掉壶且翻出 n 张尚未洗回的手牌视图, 洗完后的手牌)。
+    """
+    if not any("怠慢壶" in c for c in drawn_cards):
+        return drawn_cards, None, []
+
+    hand_before = list(drawn_cards)
+    fake_g_ref_first_5 = hand_before[:draw_size]
+
+    rm_idx = next(i for i, c in enumerate(drawn_cards) if "怠慢壶" in c)
+    hand_minus_pot = drawn_cards[:rm_idx] + drawn_cards[rm_idx + 1 :]
+
+    remaining_cards = get_remaining_cards(card_pool, hand_minus_pot)
+    if not remaining_cards:
+        triple = (hand_before, list(hand_minus_pot), list(hand_minus_pot))
+        return hand_minus_pot, triple, []
+
+    n_effective = min(max(int(n), 1), len(remaining_cards))
+    new_cards = draw_cards(remaining_cards, n_effective)
+
+    combined = list(hand_minus_pot) + list(new_cards)
+    exc_start = len(hand_minus_pot)
+    shape_counts = Counter(_strip_leading_post(c) for c in combined)
+
+    tiers_by_idx = [
+        _dai_man_shuffle_tier(
+            combined[i],
+            fake_g_ref_first_5,
+            hand_before,
+            shape_counts,
+            is_excavated=(i >= exc_start),
+            used_sancai=used_sancai,
+            used_sanhao=used_sanhao,
+        )
+        for i in range(len(combined))
+    ]
+
+    remove_count = n_effective - 1
+    rm_indices = _dai_man_pick_remove_indices(combined, tiers_by_idx, remove_count)
+    after_hand = [c for j, c in enumerate(combined) if j not in rm_indices]
+    excav_kept = [
+        combined[i]
+        for i in range(exc_start, len(combined))
+        if i not in rm_indices
+    ]
+
+    mid_hand = list(combined)
+
+    triple = (hand_before, mid_hand, after_hand)
+    return after_hand, triple, excav_kept
 
 
 def handle_pot(drawn_cards, card_pool):
@@ -350,28 +795,63 @@ def simulate_draws(
     enable_going_second=False,
     amphibian_merge_one_rules=(),
     dong_merge_rules=(),
+    dai_man_pot_n=None,
 ):
+    """环境变量 PROB_SIM_SEED：若为整数则静默固定 RNG（不改变打印内容）。"""
+    _seed_rng_from_env()
+
     condition_counts = {i: 0 for i in range(len(conditions_list))}
     drawn_cards_snapshots = []
 
     for draw_num in range(1, num_draws + 1):
+        dai_man_compare = None
         initial_draw_size = draw_size + (1 if enable_going_second else 0)
         drawn_cards = draw_cards(card_pool, initial_draw_size)
-        # 后手第六抽（额外起手那张）不计入“假g 触发抽一”的判定：只看前 5 张起手。
-        fake_g_count = sum(1 for card in drawn_cards[:draw_size] if "假g" in card)
+        opening_first_5 = drawn_cards[:draw_size]
+
+        # 后手 yes：仅看最初 5 张起手（第 6 张不参与）；1 张假 g 抽 1，两张及以上假 g 抽 2。
+        fake_g_count = sum(1 for card in opening_first_5 if "假g" in card)
         fake_g_draw_times = 0
         if enable_going_second:
             if fake_g_count >= 2:
                 fake_g_draw_times = 2
-            elif fake_g_count == 1:
+            elif fake_g_count >= 1:
                 fake_g_draw_times = 1
+        if fake_g_draw_times:
+            drawn_cards = handle_fake_g_going_second(
+                drawn_cards, card_pool, draw_times=fake_g_draw_times
+            )
+
         drawn_cards = handle_pot(drawn_cards, card_pool)
         drawn_cards = zizou(drawn_cards, card_pool)
         drawn_cards = jianshen(drawn_cards, card_pool)
         drawn_cards = anchou(drawn_cards, card_pool)
-        if fake_g_draw_times:
-            drawn_cards = handle_fake_g_going_second(
-                drawn_cards, card_pool, draw_times=fake_g_draw_times
+
+        # 开局三才、三号 → 怠慢壶 → 再结算翻出保留的三才/三号。
+        # 「已使用」以怠慢壶前的快照为准：仅此前手上也有过三才/三号，壶翻出重复卡才 tier1 洗回。
+        used_sancai = any("三才" in c for c in drawn_cards)
+        handle_sancai_draw(drawn_cards, card_pool)
+        used_sanhao = False
+        if enable_going_second:
+            used_sanhao = any("三号" in c for c in drawn_cards)
+            apply_going_second_sanhao(drawn_cards)
+
+        excav_kept = []
+        if dai_man_pot_n is not None:
+            drawn_cards, dai_man_compare, excav_kept = handle_dai_man_pot(
+                drawn_cards,
+                card_pool,
+                dai_man_pot_n,
+                used_sancai=used_sancai,
+                used_sanhao=used_sanhao,
+            )
+        dai_man_was_used = dai_man_compare is not None
+
+        if any("三才" in c for c in excav_kept):
+            handle_sancai_draw(drawn_cards, card_pool)
+        if enable_going_second and any("三号" in c for c in excav_kept):
+            apply_going_second_sanhao_excavated_only(
+                drawn_cards, excav_kept, dai_man_was_used=dai_man_was_used
             )
 
         matched_condition = None
@@ -387,7 +867,9 @@ def simulate_draws(
                 break
 
         if draw_num % num_show == 0:
-            drawn_cards_snapshots.append((draw_num, drawn_cards[:], matched_condition))
+            drawn_cards_snapshots.append(
+                (draw_num, drawn_cards[:], matched_condition, dai_man_compare)
+            )
 
     probabilities = {
         i: count / num_draws
@@ -405,6 +887,7 @@ def simulate_and_report(
     enable_going_second=False,
     amphibian_merge_one_rules=(),
     dong_merge_rules=(),
+    dai_man_pot_n=None,
 ):
     """
     进行抽卡模拟，记录每 num_show 次的抽卡结果，并输出每个条件的满足概率。
@@ -415,6 +898,7 @@ def simulate_and_report(
         enable_going_second=enable_going_second,
         amphibian_merge_one_rules=amphibian_merge_one_rules,
         dong_merge_rules=dong_merge_rules,
+        dai_man_pot_n=dai_man_pot_n,
     )
 
     report_drawn_cards(drawn_cards_snapshots, conditions_list)
@@ -425,12 +909,18 @@ def report_drawn_cards(drawn_cards_snapshots, conditions_list):
     """
     输出每 num_show 次抽卡的结果。
     """
-    for draw_num, cards, matched_condition in drawn_cards_snapshots:
+    for item in drawn_cards_snapshots:
+        draw_num, cards, matched_condition, dai_man_compare = item
         if matched_condition:
             condition_index = conditions_list.index(matched_condition) + 1
             print(f"第 {draw_num} 次抽卡结果: {cards}，符合条件情况: {condition_index}")
         else:
             print(f"第 {draw_num} 次抽卡结果: {cards}，没有匹配的条件")
+        if dai_man_compare is not None:
+            before_dm, mid_dm, after_dm = dai_man_compare
+            print(f"  怠慢壶前手牌: {before_dm}")
+            print(f"  怠慢壶翻出未洗回: {mid_dm}")
+            print(f"  怠慢壶洗完手牌: {after_dm}")
 
 
 def report_probabilities(probabilities, conditions_list, title, group_sizes):
