@@ -3,7 +3,13 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from app.settings import DECK_DIR, DEFAULT_DECK_PATH, DEFAULT_START_PATH, START_DIR
+from app.settings import (
+    DAI_MAN_POT_N,
+    DECK_DIR,
+    DEFAULT_DECK_PATH,
+    DEFAULT_START_PATH,
+    START_DIR,
+)
 from gui.facade import AppFacade
 from infrastructure.reporters.format import format_simulation_result
 
@@ -22,7 +28,7 @@ class MainWindow(tk.Tk):
         self._start_var = tk.StringVar(value=str(DEFAULT_START_PATH))
         self._second_var = tk.BooleanVar(value=False)
         self._ydk_var = tk.BooleanVar(value=False)
-        self._dai_man_var = tk.StringVar(value="6")
+        self._dai_man_var = tk.StringVar(value=str(DAI_MAN_POT_N))
         self._trials_var = tk.StringVar(value="400000")
         self._seed_var = tk.StringVar(value="")
 
@@ -163,7 +169,7 @@ class MainWindow(tk.Tk):
 
         dai_man_n = None
         if str(self._dai_man_spin.cget("state")) != str(tk.DISABLED):
-            dai_man_n = self._parse_int(self._dai_man_var, 6)
+            dai_man_n = self._parse_int(self._dai_man_var, DAI_MAN_POT_N)
 
         trials = self._parse_int(self._trials_var, 400_000) or 400_000
         seed = self._parse_int(self._seed_var, None)
