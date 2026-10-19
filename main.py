@@ -6,7 +6,7 @@ from pathlib import Path
 from cli.legacy import run_interactive
 
 # --- 在此选择本次要用的文件 ---
-DECK_PATH = Path("构筑/41卡魔法师均构筑.txt")
+DECK_PATH = Path("构筑/41卡魔法师均构筑无种子.txt")
 START_PATH = Path("启动/魔法师均简易启动.txt")
 
 if __name__ == "__main__":
